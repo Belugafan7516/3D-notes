@@ -3,36 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Echoes - 3D Guestbook</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Echoes 3D</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #020617; font-family: 'Inter', sans-serif; touch-action: none; }
-        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
-        
-        /* UI Layer */
+        body { margin: 0; overflow: hidden; background: #020617; font-family: sans-serif; touch-action: none; }
+        #canvas-container { position: absolute; inset: 0; z-index: 0; }
         #ui-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
         .interactive { pointer-events: auto; }
-        
-        /* Modal Transitions */
-        .modal { transition: opacity 0.3s ease, transform 0.3s ease; opacity: 0; pointer-events: none; transform: scale(0.95); visibility: hidden; }
-        .modal.active { opacity: 1; pointer-events: auto; transform: scale(1); visibility: visible; }
-        
-        /* Loader */
-        #loader { position: absolute; inset: 0; background: #020617; z-index: 50; display: flex; align-items: center; justify-content: center; color: #6366f1; transition: opacity 0.5s; }
-        
-        /* Scrollbar */
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 3px; }
+        .modal { 
+            visibility: hidden; opacity: 0; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: scale(0.95);
+        }
+        .modal.active { 
+            visibility: visible; opacity: 1; 
+            transform: scale(1);
+        }
+        #loader {
+            position: fixed; inset: 0; background: #020617; 
+            z-index: 100; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: #6366f1;
+        }
+        /* Fix for iOS momentum scrolling */
+        .overflow-y-auto { -webkit-overflow-scrolling: touch; }
     </style>
-
-    <!-- Import Map: Explicitly linking Three.js and OrbitControls -->
     <script type="importmap">
         {
             "imports": {
@@ -44,700 +39,465 @@
 </head>
 <body>
 
-    <!-- Loading / Error Screen -->
     <div id="loader">
-        <div class="flex flex-col items-center gap-4 text-center p-4">
-            <i class="fa-solid fa-circle-notch fa-spin text-4xl" id="spinner"></i>
-            <span class="text-white font-medium tracking-widest text-sm" id="loading-text">INITIALIZING UNIVERSE...</span>
-            <div id="error-log" class="hidden text-red-400 text-xs mt-4 max-w-md bg-red-900/20 p-2 rounded border border-red-500/50"></div>
-            <button id="force-start-btn" class="hidden mt-4 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded text-xs border border-white/20" onclick="forceHideLoader()">
-                Skip Loading
-            </button>
-        </div>
+        <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
+        <p class="text-sm font-mono tracking-widest uppercase">Initializing Void...</p>
+        <div id="error-display" class="hidden mt-6 p-4 bg-red-900/20 border border-red-500/50 text-red-400 text-xs max-w-xs rounded"></div>
     </div>
 
-    <!-- 3D Canvas -->
     <div id="canvas-container"></div>
 
-    <!-- UI Overlay -->
     <div id="ui-layer" class="flex flex-col justify-between p-4 sm:p-6 opacity-0 transition-opacity duration-1000" id="main-ui">
-        
         <!-- Header -->
         <div class="flex justify-between items-start">
-            <div class="interactive bg-black/30 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
-                <h1 class="text-white font-bold tracking-widest text-lg drop-shadow-md">ECHOES</h1>
+            <div class="interactive bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-xl">
+                <h1 class="text-white font-bold tracking-tighter text-xl">ECHOES</h1>
             </div>
-
-            <!-- Auth / User Menu -->
-            <div id="auth-container" class="interactive relative">
-                <!-- Injected via JS -->
-            </div>
+            <div id="auth-status" class="interactive"></div>
         </div>
 
-        <!-- Helper Text -->
-        <div id="helper-text" class="text-center text-white/30 text-[10px] sm:text-xs mb-16 sm:mb-0 transition-opacity duration-300 select-none">
-            Swipe to rotate • Pinch to zoom • Tap to view
+        <!-- Hint -->
+        <div class="text-center text-white/20 text-[10px] mb-20 pointer-events-none uppercase tracking-widest">
+            1 Finger: Rotate • 2 Fingers: Move/Zoom • Tap Note
         </div>
 
-        <!-- FAB (Add Note) -->
-        <div class="absolute bottom-6 left-0 right-0 flex justify-center interactive" id="fab-container" style="display: none;">
-            <button onclick="openAddModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/50 transition-transform active:scale-95 group">
-                <i class="fa-solid fa-plus text-xl group-hover:rotate-90 transition-transform duration-300"></i>
+        <!-- FAB -->
+        <div id="fab-container" class="absolute bottom-8 left-0 right-0 flex justify-center interactive hidden">
+            <button onclick="toggleModal('add-modal', true)" class="bg-indigo-600 hover:bg-indigo-500 text-white w-16 h-16 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center transition-transform active:scale-90">
+                <i class="fas fa-plus text-2xl"></i>
             </button>
         </div>
     </div>
 
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="modal fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl relative border border-white/10">
-            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                <i class="fa-solid fa-xmark text-xl"></i>
+    <!-- AUTH MODAL -->
+    <div id="auth-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl relative">
+            <button onclick="toggleModal('auth-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fas fa-xmark text-xl"></i>
             </button>
-            
-            <h2 id="auth-title" class="text-2xl font-bold text-gray-800 mb-2">Join the Void</h2>
-            <p class="text-gray-500 text-sm mb-6">Leave your mark in the infinite digital space.</p>
-            
-            <div id="auth-error" class="hidden mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100"></div>
 
-            <form id="auth-form" class="space-y-3">
-                <input type="email" id="auth-email" placeholder="Email" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all" required>
-                <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all" required>
-                <button type="submit" id="auth-submit-btn" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
-                    <span>Sign In</span>
-                </button>
+            <h2 id="auth-title" class="text-3xl font-bold text-slate-900 mb-2">Join</h2>
+            <p class="text-slate-500 text-sm mb-6">Enter your details to leave a memory.</p>
+            
+            <div id="auth-error" class="hidden mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100"></div>
+
+            <!-- Google Button -->
+            <button onclick="window.handleGoogleLogin()" class="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-3 mb-4 shadow-sm active:scale-95">
+                <i class="fab fa-google text-red-500 text-lg"></i>
+                <span>Continue with Google</span>
+            </button>
+
+            <div class="flex items-center gap-4 py-2 mb-4">
+                <div class="flex-1 border-t border-slate-100"></div>
+                <span class="text-[10px] text-slate-300 font-bold uppercase">Or with Email</span>
+                <div class="flex-1 border-t border-slate-100"></div>
+            </div>
+
+            <form id="auth-form" class="space-y-4">
+                <input type="email" id="email" placeholder="Email" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" required>
+                <input type="password" id="password" placeholder="Password" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all" required>
+                <button type="submit" id="auth-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95">Sign In</button>
             </form>
 
-            <div class="mt-4 flex flex-col gap-3 text-center">
-                <button id="auth-toggle-mode" class="text-sm text-indigo-600 font-medium hover:underline">Create new account</button>
-                <div class="relative py-2">
-                    <div class="absolute inset-0 flex items-center"><span class="w-full border-t border-gray-200"></span></div>
-                    <div class="relative flex justify-center text-xs uppercase"><span class="bg-white px-2 text-gray-400">Or</span></div>
-                </div>
-                <button onclick="handleAnonymousLogin()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-user-secret"></i> Continue as Guest
-                </button>
+            <div class="mt-6 space-y-3">
+                <button onclick="toggleAuthMode()" id="toggle-auth" class="w-full text-center text-sm text-indigo-600 font-semibold hover:underline">Need an account? Sign Up</button>
+                <button onclick="handleAnon()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95">Continue as Guest</button>
             </div>
         </div>
     </div>
 
-    <!-- View Note Modal -->
-    <div id="view-modal" class="modal fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="absolute inset-0" onclick="closeViewModal()"></div>
-        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden relative shadow-2xl z-50 flex flex-col max-h-[85vh] animate-in zoom-in-95">
-            <div class="absolute top-2 right-2 z-10">
-                <button onclick="closeViewModal()" class="bg-black/10 hover:bg-black/20 p-2 rounded-full text-gray-700 w-8 h-8 flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+    <!-- VIEW MODAL -->
+    <div id="view-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <!-- Background click removed for strict closing -->
+        <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
+            <button onclick="toggleModal('view-modal', false)" class="absolute top-4 right-4 bg-black/10 hover:bg-black/20 w-10 h-10 rounded-full flex items-center justify-center text-slate-800 transition-all z-20">
+                <i class="fas fa-xmark"></i>
+            </button>
+            <div id="view-body" class="overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- ADD MODAL -->
+    <div id="add-modal" class="modal fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[95vh] relative">
+            <div class="p-4 border-b flex justify-between items-center">
+                <button onclick="toggleModal('add-modal', false)" class="text-slate-400 p-2"><i class="fas fa-xmark text-xl"></i></button>
+                <span class="font-bold text-slate-800 uppercase tracking-widest text-xs">Post Note</span>
+                <button onclick="submitNote()" id="post-btn" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm disabled:opacity-50">Post</button>
             </div>
-            
-            <div class="overflow-y-auto custom-scroll" id="view-content">
-                <!-- Content injected here -->
+            <div class="p-6 overflow-y-auto">
+                <textarea id="note-text" placeholder="What's on your mind?" class="w-full h-40 p-0 text-xl text-slate-800 border-none resize-none focus:ring-0 placeholder:text-slate-300 outline-none"></textarea>
+                <div id="img-preview-box" class="hidden relative mt-4 rounded-2xl overflow-hidden border border-slate-100">
+                    <img id="img-preview" class="w-full h-auto max-h-60 object-cover">
+                    <button onclick="removeImg()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-trash-can text-xs"></i></button>
+                </div>
+                <div id="img-trigger" onclick="document.getElementById('file-in').click()" class="mt-4 p-8 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-200 hover:bg-indigo-50/50 transition-all text-slate-400">
+                    <i class="fas fa-camera text-2xl"></i>
+                    <span class="text-xs font-bold uppercase">Add a Photo</span>
+                </div>
+                <input type="file" id="file-in" class="hidden" accept="image/*" onchange="previewFile(event)">
             </div>
         </div>
     </div>
 
-    <!-- Add Note Modal -->
-    <div id="add-modal" class="modal fixed inset-0 z-40 bg-white sm:bg-black/80 sm:backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
-        <div class="absolute inset-0 hidden sm:block" onclick="closeAddModal()"></div>
-        <div class="bg-white w-full h-full sm:h-auto sm:max-w-md sm:rounded-2xl flex flex-col shadow-2xl relative z-10 animate-in slide-in-from-bottom-5">
-            <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
-                <button onclick="closeAddModal()" class="text-gray-500 hover:bg-gray-200 p-2 rounded-full w-10 h-10 flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-                <span class="font-bold text-gray-700">New Memory</span>
-                <button onclick="submitNote()" id="post-btn" class="bg-indigo-600 text-white px-5 py-1.5 rounded-full font-bold text-sm shadow-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors">
-                    Post
-                </button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-4 custom-scroll">
-                <textarea id="note-text" placeholder="What do you want to leave behind?" class="w-full h-40 p-0 text-xl text-gray-800 border-none resize-none focus:ring-0 placeholder:text-gray-300 outline-none"></textarea>
-                
-                <div id="image-preview-container" class="hidden relative mt-4 rounded-xl overflow-hidden border border-gray-100 shadow-sm group">
-                    <img id="image-preview" class="w-full h-auto max-h-60 object-cover bg-black">
-                    <button onclick="removeImage()" class="absolute top-2 right-2 bg-black/50 text-white w-8 h-8 rounded-full backdrop-blur-sm flex items-center justify-center hover:bg-red-500 transition-colors">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-
-                <div id="image-upload-btn" class="mt-4" onclick="document.getElementById('file-input').click()">
-                    <div class="w-full py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 flex flex-col items-center justify-center gap-2 hover:border-indigo-300 hover:text-indigo-500 transition-colors cursor-pointer bg-gray-50">
-                        <i class="fa-regular fa-image text-2xl"></i>
-                        <span class="text-sm font-medium">Add a photo</span>
-                    </div>
-                </div>
-                <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleImageSelect(event)">
-            </div>
-        </div>
-    </div>
-
-    <!-- MAIN SCRIPT -->
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
         import { 
             getAuth, 
             signInWithEmailAndPassword, 
             createUserWithEmailAndPassword, 
             signInAnonymously, 
+            onAuthStateChanged, 
             signOut, 
-            onAuthStateChanged,
             signInWithCustomToken,
-            updateProfile 
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            onSnapshot, 
-            serverTimestamp, 
-            query, 
-            orderBy 
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+            GoogleAuthProvider,
+            signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
-        // Global Error Handling
-        window.onerror = function(message, source, lineno, colno, error) {
-            console.error("Global Error:", message);
-            const log = document.getElementById('error-log');
-            log.innerHTML += `<div>${message}</div>`;
-            log.classList.remove('hidden');
-            document.getElementById('force-start-btn').classList.remove('hidden');
-        };
-
-        // --- Config & State ---
-        let app, auth, db, appId;
-        let currentUser = null;
-        let notes = [];
+        // --- GLOBAL STATE ---
+        let db, auth, appId;
         let scene, camera, renderer, controls, raycaster, pointer;
         let noteMeshes = [];
-        let isAuthLoginMode = true;
-        let stars;
+        let isLogin = true;
+        let selectedImg = null;
 
-        // --- 1. Initialize Firebase ---
-        try {
-            if (typeof __firebase_config === 'undefined') {
-                throw new Error("Firebase config missing from environment.");
-            }
-            const firebaseConfig = JSON.parse(__firebase_config);
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-            
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) {
-            window.onerror("Firebase Init Failed: " + e.message);
-        }
+        // --- UTILS ---
+        const showError = (msg) => {
+            const d = document.getElementById('error-display');
+            d.innerHTML = msg; d.classList.remove('hidden');
+        };
 
-        // --- 2. Initialize 3D Engine ---
-        function initThree() {
+        window.toggleModal = (id, show) => {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.toggle('active', show);
+        };
+
+        // --- FIREBASE INIT ---
+        const startApp = async () => {
             try {
-                // Scene
-                scene = new THREE.Scene();
-                scene.fog = new THREE.FogExp2(0x020617, 0.03);
-
-                // Camera
-                camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-                camera.position.set(0, 0, 18);
-
-                // Renderer
-                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-                // Lights
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-                scene.add(ambientLight);
-
-                const blueLight = new THREE.PointLight(0x6366f1, 1.5, 50);
-                blueLight.position.set(10, 10, 10);
-                scene.add(blueLight);
+                const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+                if (!configStr) throw new Error("Firebase configuration not found in environment.");
                 
-                const warmLight = new THREE.PointLight(0xf43f5e, 0.8, 50);
-                warmLight.position.set(-10, -5, -10);
-                scene.add(warmLight);
-
-                // Controls
-                controls = new OrbitControls(camera, renderer.domElement);
-                controls.enableDamping = true;
-                controls.dampingFactor = 0.05;
-                controls.rotateSpeed = 0.5;
-                controls.enablePan = false;
-                controls.minDistance = 4;
-                controls.maxDistance = 25;
-                controls.autoRotate = true;
-                controls.autoRotateSpeed = 0.5;
+                const firebaseConfig = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'guestbook-app';
                 
-                // Stars
-                createStars();
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
 
-                // Interactions
-                raycaster = new THREE.Raycaster();
-                pointer = new THREE.Vector2();
-                window.addEventListener('resize', onWindowResize);
-                window.addEventListener('pointerdown', onPointerDown);
+                // --- AUTH HANDLERS ---
+                window.handleSignOut = async () => {
+                    try { await signOut(auth); } 
+                    catch (err) { console.error("Sign out error:", err); }
+                };
 
-                // Start Loop
-                animate();
+                window.handleGoogleLogin = async () => {
+                    const err = document.getElementById('auth-error');
+                    err.classList.add('hidden');
+                    try {
+                        const provider = new GoogleAuthProvider();
+                        await signInWithPopup(auth, provider);
+                        window.toggleModal('auth-modal', false);
+                    } catch (error) {
+                        console.error("Google Auth Error:", error);
+                        err.innerText = error.message.replace("Firebase: ", "");
+                        err.classList.remove('hidden');
+                    }
+                };
 
-                // Reveal UI
-                hideLoader();
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token).catch(() => signInAnonymously(auth));
+                } else {
+                    await signInAnonymously(auth).catch(e => console.warn("Anon login failed", e));
+                }
+
+                init3D();
+                setupAuthListener();
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('ui-layer').style.opacity = '1';
+                }, 500);
 
             } catch (e) {
-                window.onerror("3D Engine Failed: " + e.message);
+                showError("Startup Failed: " + e.message);
+                console.error(e);
             }
-        }
+        };
 
-        function createStars() {
-            const geometry = new THREE.BufferGeometry();
-            const count = 1000;
-            const positions = new Float32Array(count * 3);
-            for(let i = 0; i < count * 3; i++) {
-                positions[i] = (Math.random() - 0.5) * 60;
-            }
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const material = new THREE.PointsMaterial({ size: 0.1, color: 0xffffff, transparent: true, opacity: 0.6, sizeAttenuation: true });
-            stars = new THREE.Points(geometry, material);
-            scene.add(stars);
-        }
+        // --- 3D ENGINE ---
+        const init3D = () => {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x020617, 0.04);
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, 15);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-        // --- 3. Interaction Logic ---
-        let isDragging = false;
-        let startX, startY;
+            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambient);
+            const point = new THREE.PointLight(0x6366f1, 2, 50);
+            point.position.set(5, 5, 5);
+            scene.add(point);
 
-        // Distinguish drag from click
-        window.addEventListener('pointerdown', (e) => {
-            isDragging = false;
-            startX = e.clientX;
-            startY = e.clientY;
-        });
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5;
+            controls.enablePan = true; // Enabled panning for movement
+            controls.minDistance = 5;
+            controls.maxDistance = 25;
 
-        window.addEventListener('pointermove', (e) => {
-            if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
-                isDragging = true;
-            }
-        });
+            // Stars
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 1000;
+            const pos = new Float32Array(starCount * 3);
+            for(let i=0; i<starCount*3; i++) pos[i] = (Math.random() - 0.5) * 50;
+            starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.1, color: 0xffffff, transparent: true, opacity: 0.5 })));
 
-        function onPointerDown(event) {
-            // Wait for pointerup to check for drag, using pointerdown just to capture logic is tricky
-            // Simpler: use the click handler but in 3D we need raycasting
-        }
-        
-        // Use a click listener on the canvas specifically
-        document.getElementById('canvas-container').addEventListener('click', (event) => {
-            if (isDragging) return; // Don't click if we were rotating
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
 
-            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            raycaster.setFromCamera(pointer, camera);
-            const intersects = raycaster.intersectObjects(noteMeshes, true);
-
-            if (intersects.length > 0) {
-                let obj = intersects[0].object;
-                // Traverse up to find the group
-                while(obj.parent && obj.parent.type !== 'Scene') {
-                    if (obj.userData.isNoteGroup) break;
-                    obj = obj.parent;
-                }
-                
-                if (obj.userData.isNoteGroup && obj.userData.noteData) {
-                    controls.autoRotate = false; // Stop rotating when reading
-                    openViewModal(obj.userData.noteData);
-                }
-            } else {
-                controls.autoRotate = true; // Resume rotation if clicking void
-            }
-        });
-
-
-        // --- 4. Content Logic ---
-
-        function createTextTexture(text) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 256;
-            const ctx = canvas.getContext('2d');
-            
-            // Debug background
-            // ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(0,0,512,256);
-            
-            ctx.fillStyle = '#1e293b'; // slate-800
-            ctx.font = 'bold 36px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            const words = text.split(' ');
-            let line = '';
-            let lines = [];
-            
-            for(let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' ';
-                const metrics = ctx.measureText(testLine);
-                if (metrics.width > 480 && n > 0) {
-                    lines.push(line);
-                    line = words[n] + ' ';
-                } else {
-                    line = testLine;
-                }
-            }
-            lines.push(line);
-            
-            let y = 128 - ((lines.length - 1) * 24);
-            for(let i = 0; i < lines.length; i++) {
-                ctx.fillText(lines[i], 256, y + (i * 48));
-            }
-            
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        function updateSceneNotes(newNotes) {
-            noteMeshes.forEach(mesh => scene.remove(mesh));
-            noteMeshes = [];
-
-            newNotes.forEach(note => {
-                const group = new THREE.Group();
-                group.position.set(note.position[0], note.position[1], note.position[2]);
-                group.rotation.set(note.rotation[0], note.rotation[1], note.rotation[2]);
-                group.userData = { isNoteGroup: true, noteData: note, randomOffset: Math.random() * 100 };
-
-                // Card
-                const geometry = new THREE.BoxGeometry(3, 4, 0.1);
-                const material = new THREE.MeshStandardMaterial({ 
-                    color: note.color || 0xffffff,
-                    roughness: 0.5,
-                    metalness: 0.1
-                });
-                const cube = new THREE.Mesh(geometry, material);
-                group.add(cube);
-
-                // Image
-                if (note.image) {
-                    const textureLoader = new THREE.TextureLoader();
-                    textureLoader.load(note.image, (tex) => {
-                        const imgGeo = new THREE.PlaneGeometry(2.6, 2.2);
-                        // Using tonemapping false to keep colors bright
-                        const imgMat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
-                        const imgMesh = new THREE.Mesh(imgGeo, imgMat);
-                        imgMesh.position.set(0, 0.8, 0.06);
-                        group.add(imgMesh);
-                    });
-                }
-
-                // Text
-                if (note.text) {
-                    const textTex = createTextTexture(note.text.length > 40 ? note.text.substring(0, 40) + '...' : note.text);
-                    const textGeo = new THREE.PlaneGeometry(2.8, 1.4);
-                    const textMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true });
-                    const textMesh = new THREE.Mesh(textGeo, textMat);
-                    textMesh.position.set(0, note.image ? -1 : 0, 0.06);
-                    group.add(textMesh);
-                }
-
-                // Glow ring (hidden by default)
-                scene.add(group);
-                noteMeshes.push(group);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
             });
-        }
 
-        function animate() {
+            // Improved Touch/Click handling
+            let isDragging = false;
+            let mouseDownTime = 0;
+            const threshold = 200; // ms to distinguish click from drag
+
+            renderer.domElement.addEventListener('pointerdown', () => {
+                isDragging = false;
+                mouseDownTime = Date.now();
+            });
+
+            renderer.domElement.addEventListener('pointermove', () => {
+                isDragging = true;
+            });
+
+            renderer.domElement.addEventListener('pointerup', (e) => {
+                const timeDiff = Date.now() - mouseDownTime;
+                // Only consider it a click if it was a short press and minimal movement
+                if (timeDiff < threshold) {
+                    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(pointer, camera);
+                    const intersects = raycaster.intersectObjects(noteMeshes, true);
+                    if (intersects.length > 0) {
+                        let obj = intersects[0].object;
+                        while(obj.parent && !obj.userData.note) obj = obj.parent;
+                        if(obj.userData.note) openNote(obj.userData.note);
+                    }
+                }
+            });
+
+            animate();
+        };
+
+        const animate = () => {
             requestAnimationFrame(animate);
             if (controls) controls.update();
-            
-            if (stars) stars.rotation.y += 0.0002;
-
-            const time = Date.now() * 0.001;
-            noteMeshes.forEach(mesh => {
-                mesh.position.y += Math.sin(time + mesh.userData.randomOffset) * 0.003;
-                mesh.rotation.z = Math.sin(time * 0.5 + mesh.userData.randomOffset) * 0.05;
+            const t = Date.now() * 0.001;
+            noteMeshes.forEach(m => {
+                m.position.y += Math.sin(t + m.userData.offset) * 0.002;
+                m.rotation.y += 0.001;
             });
+            renderer.render(scene, camera);
+        };
 
-            if (renderer && scene && camera) {
-                renderer.render(scene, camera);
-            }
-        }
-
-        // --- 5. App Lifecycle ---
-
-        function hideLoader() {
-            const loader = document.getElementById('loader');
-            const ui = document.getElementById('main-ui');
-            if (loader) {
-                loader.style.opacity = '0';
-                ui.style.opacity = '1';
-                setTimeout(() => loader.style.display = 'none', 500);
-            }
-        }
-
-        window.forceHideLoader = hideLoader;
-
-        // Auto-start timer (Force start if stuck for 8 seconds)
-        setTimeout(() => {
-            const loader = document.getElementById('loader');
-            if(loader && loader.style.display !== 'none') {
-                document.getElementById('loading-text').innerText = "TAKING LONGER THAN USUAL...";
-                document.getElementById('force-start-btn').classList.remove('hidden');
-            }
-        }, 5000);
-
-
-        // Auth Listener
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            updateUI(user);
+        // --- CONTENT LOGIC ---
+        const createNoteMesh = (note) => {
+            const group = new THREE.Group();
+            group.userData = { note, offset: Math.random() * 10 };
             
-            if (user) {
-                const notesRef = collection(db, 'artifacts', appId, 'public', 'data', 'notes3d');
-                const q = query(notesRef);
-                onSnapshot(q, (snapshot) => {
-                    notes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    updateSceneNotes(notes);
-                }, (err) => {
-                    console.error("Firestore Error:", err);
-                    window.onerror("DB Error: " + err.message);
+            const card = new THREE.Mesh(
+                new THREE.BoxGeometry(3, 4, 0.1),
+                new THREE.MeshStandardMaterial({ color: note.color || 0xffffff, roughness: 0.8 })
+            );
+            group.add(card);
+
+            if (note.image) {
+                new THREE.TextureLoader().load(note.image, (tex) => {
+                    const img = new THREE.Mesh(
+                        new THREE.PlaneGeometry(2.6, 2.2),
+                        new THREE.MeshBasicMaterial({ map: tex })
+                    );
+                    img.position.set(0, 0.7, 0.06);
+                    group.add(img);
                 });
-            } else {
-                updateSceneNotes([]);
             }
-        });
 
-        // Init Sequence
-        (async () => {
-            // Try silent auth first
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                try {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } catch(e) { console.warn("Auto-auth failed", e); }
-            }
-            // Start engine regardless of auth status
-            initThree();
-        })();
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e293b'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+            const words = (note.text || "").substring(0, 30) + (note.text.length > 30 ? "..." : "");
+            ctx.fillText(words, 128, 64);
+            const tex = new THREE.CanvasTexture(canvas);
+            const txt = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+            txt.position.set(0, note.image ? -1 : 0, 0.06);
+            group.add(txt);
 
-        // --- 6. UI Handlers (Global) ---
-
-        window.updateUI = (user) => {
-            const container = document.getElementById('auth-container');
-            const fab = document.getElementById('fab-container');
-            
-            if (user) {
-                fab.style.display = 'flex';
-                let displayName = user.isAnonymous ? 'Guest' : (user.displayName || user.email.split('@')[0]);
-                
-                container.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <div class="bg-black/40 backdrop-blur-md p-2 px-3 rounded-full border border-white/10 text-white flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-colors shadow-lg" onclick="toggleUserMenu()">
-                            <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                            <span class="text-xs font-bold uppercase tracking-wider">${displayName}</span>
-                        </div>
-                        <div id="user-menu" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 origin-top-right z-50">
-                             <div class="px-4 py-3 border-b bg-gray-50">
-                                <p class="text-xs text-gray-500 font-bold uppercase">Signed in as</p>
-                                <p class="text-sm text-gray-800 truncate">${displayName}</p>
-                             </div>
-                             <button onclick="handleSignOut()" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
-                                <i class="fa-solid fa-right-from-bracket"></i> Sign Out
-                            </button>
-                        </div>
-                    </div>
-                `;
-            } else {
-                fab.style.display = 'none';
-                container.innerHTML = `
-                    <button onclick="openAuthModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
-                        Log In
-                    </button>
-                `;
-            }
+            group.position.set(note.pos[0], note.pos[1], note.pos[2]);
+            group.rotation.set(note.rot[0], note.rot[1], note.rot[2]);
+            return group;
         };
 
-        window.toggleUserMenu = () => {
-            const menu = document.getElementById('user-menu');
-            if(menu) menu.classList.toggle('hidden');
-        };
-
-        window.handleSignOut = () => {
-            signOut(auth);
-            document.getElementById('user-menu')?.classList.add('hidden');
-        };
-
-        // Modal Helpers
-        window.openAuthModal = () => document.getElementById('auth-modal').classList.add('active');
-        window.closeAuthModal = () => document.getElementById('auth-modal').classList.remove('active');
-        window.openAddModal = () => document.getElementById('add-modal').classList.add('active');
-        window.closeAddModal = () => document.getElementById('add-modal').classList.remove('active');
-        window.closeViewModal = () => document.getElementById('view-modal').classList.remove('active');
-
-        // Auth Form Logic
-        document.getElementById('auth-toggle-mode').addEventListener('click', () => {
-            isAuthLoginMode = !isAuthLoginMode;
-            const title = document.getElementById('auth-title');
-            const btn = document.getElementById('auth-submit-btn');
-            const toggle = document.getElementById('auth-toggle-mode');
-            
-            if(isAuthLoginMode) {
-                title.innerText = 'Join the Void';
-                btn.innerHTML = '<span>Sign In</span>';
-                toggle.innerText = 'Create new account';
-            } else {
-                title.innerText = 'Create Account';
-                btn.innerHTML = '<span>Sign Up</span>';
-                toggle.innerText = 'Already have an account? Login';
-            }
-            document.getElementById('auth-error').classList.add('hidden');
-        });
-
-        document.getElementById('auth-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-            const errorDiv = document.getElementById('auth-error');
-            const btn = document.getElementById('auth-submit-btn');
-            
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
-            btn.disabled = true;
-            errorDiv.classList.add('hidden');
-
-            try {
-                if (isAuthLoginMode) {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } else {
-                    await createUserWithEmailAndPassword(auth, email, password);
-                }
-                closeAuthModal();
-            } catch (err) {
-                errorDiv.innerText = err.message.replace('Firebase:', '');
-                errorDiv.classList.remove('hidden');
-            } finally {
-                btn.innerHTML = isAuthLoginMode ? '<span>Sign In</span>' : '<span>Sign Up</span>';
-                btn.disabled = false;
-            }
-        });
-
-        window.handleAnonymousLogin = async () => {
-             try {
-                await signInAnonymously(auth);
-                closeAuthModal();
-             } catch (e) {
-                console.error(e);
-                alert('Guest login failed: ' + e.message);
-             }
-        };
-
-        // View Note
-        window.openViewModal = (data) => {
-            const content = document.getElementById('view-content');
-            const date = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleDateString() : 'Just now';
-            const initial = (data.displayName?.[0] || 'A').toUpperCase();
-            
-            content.innerHTML = `
-                ${data.image ? `<div class="w-full bg-black flex justify-center"><img src="${data.image}" class="max-h-[300px] w-auto object-contain"></div>` : ''}
-                <div class="p-6">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg border border-indigo-200">${initial}</div>
+        const openNote = (note) => {
+            const body = document.getElementById('view-body');
+            body.innerHTML = `
+                ${note.image ? `<img src="${note.image}" class="w-full h-auto bg-black max-h-[400px] object-contain">` : ''}
+                <div class="p-8">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xl">${(note.author?.[0] || 'A').toUpperCase()}</div>
                         <div>
-                            <p class="text-sm font-bold text-gray-900 leading-none mb-1">${data.displayName}</p>
-                            <p class="text-xs text-gray-500">${date}</p>
+                            <p class="font-bold text-slate-900">${note.author}</p>
+                            <p class="text-xs text-slate-400">${note.time ? new Date(note.time.seconds * 1000).toDateString() : 'Now'}</p>
                         </div>
                     </div>
-                    <p class="text-lg text-gray-700 font-serif leading-relaxed whitespace-pre-wrap">"${data.text}"</p>
+                    <p class="text-xl text-slate-700 font-serif leading-relaxed italic">"${note.text}"</p>
                 </div>
             `;
-            document.getElementById('view-modal').classList.add('active');
+            window.toggleModal('view-modal', true);
         };
 
-        // Post Note
-        let currentImageBase64 = null;
-
-        window.handleImageSelect = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_SIZE = 600;
-                    let w = img.width;
-                    let h = img.height;
-                    
-                    if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
-                    else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
-                    
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    
-                    currentImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    document.getElementById('image-preview').src = currentImageBase64;
-                    document.getElementById('image-preview-container').classList.remove('hidden');
-                    document.getElementById('image-upload-btn').classList.add('hidden');
+        // --- AUTH LISTENER ---
+        const setupAuthListener = () => {
+            onAuthStateChanged(auth, (user) => {
+                const status = document.getElementById('auth-status');
+                const fab = document.getElementById('fab-container');
+                if (user) {
+                    fab.classList.remove('hidden');
+                    const name = user.isAnonymous ? 'Guest' : (user.displayName || user.email.split('@')[0]);
+                    status.innerHTML = `
+                        <div onclick="window.handleSignOut()" class="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-[10px] font-bold tracking-widest uppercase border border-white/10 flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-all shadow-lg active:scale-95">
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                            <span>${name}</span>
+                            <i class="fas fa-right-from-bracket ml-1 opacity-50"></i>
+                        </div>
+                    `;
+                    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'memories'));
+                    onSnapshot(q, (snap) => {
+                        noteMeshes.forEach(m => scene.remove(m));
+                        noteMeshes = [];
+                        snap.docs.forEach(d => {
+                            const mesh = createNoteMesh(d.data());
+                            scene.add(mesh);
+                            noteMeshes.push(mesh);
+                        });
+                    }, (err) => console.error("Firestore Error:", err));
+                } else {
+                    fab.classList.add('hidden');
+                    status.innerHTML = `<button onclick="window.toggleModal('auth-modal', true)" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Login</button>`;
                 }
+            });
+        };
+
+        window.toggleAuthMode = () => {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').innerText = isLogin ? "Join" : "Sign Up";
+            document.getElementById('auth-btn').innerText = isLogin ? "Sign In" : "Create Account";
+            document.getElementById('toggle-auth').innerText = isLogin ? "Need an account? Sign Up" : "Have an account? Sign In";
+        };
+
+        document.getElementById('auth-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('password').value;
+            const err = document.getElementById('auth-error');
+            const btn = document.getElementById('auth-btn');
+            
+            err.classList.add('hidden');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`;
+            
+            try {
+                if(isLogin) await signInWithEmailAndPassword(auth, email, pass);
+                else await createUserWithEmailAndPassword(auth, email, pass);
+                window.toggleModal('auth-modal', false);
+            } catch(e) {
+                err.innerText = e.message.replace("Firebase: ", ""); err.classList.remove('hidden');
+            } finally {
+                btn.disabled = false; btn.innerText = isLogin ? "Sign In" : "Create Account";
             }
         };
 
-        window.removeImage = () => {
-            currentImageBase64 = null;
-            document.getElementById('image-preview-container').classList.add('hidden');
-            document.getElementById('image-upload-btn').classList.remove('hidden');
-            document.getElementById('file-input').value = "";
+        window.handleAnon = () => signInAnonymously(auth).then(() => window.toggleModal('auth-modal', false));
+
+        // --- POSTING LOGIC ---
+        window.previewFile = (e) => {
+            const f = e.target.files[0];
+            if(!f) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.src = ev.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX = 600;
+                    let w = img.width, h = img.height;
+                    if(w > h) { if(w > MAX) { h *= MAX/w; w = MAX; } }
+                    else { if(h > MAX) { w *= MAX/h; h = MAX; } }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    selectedImg = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('img-preview').src = selectedImg;
+                    document.getElementById('img-preview-box').classList.remove('hidden');
+                    document.getElementById('img-trigger').classList.add('hidden');
+                };
+            };
+            reader.readAsDataURL(f);
+        };
+
+        window.removeImg = () => {
+            selectedImg = null;
+            document.getElementById('img-preview-box').classList.add('hidden');
+            document.getElementById('img-trigger').classList.remove('hidden');
         };
 
         window.submitNote = async () => {
-            const text = document.getElementById('note-text').value;
-            if (!text.trim()) return;
-            
+            const txt = document.getElementById('note-text').value;
+            if(!txt.trim()) return;
             const btn = document.getElementById('post-btn');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            btn.disabled = true;
+            btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`;
             
             try {
-                // Spherical Coordinates for placement
-                const radius = 12 + (Math.random() * 4); // Vary depth slightly
+                const rad = 10 + Math.random() * 5;
                 const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos((Math.random() * 2) - 1);
+                const phi = Math.acos(Math.random() * 2 - 1);
                 
-                const x = radius * Math.sin(phi) * Math.cos(theta);
-                const y = radius * Math.sin(phi) * Math.sin(theta);
-                const z = radius * Math.cos(phi);
-
-                const colors = ["#ffffff", "#eff6ff", "#fdf4ff", "#fff7ed", "#f0f9ff"];
-
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notes3d'), {
-                    text: text.trim(),
-                    image: currentImageBase64,
-                    position: [x, y, z],
-                    rotation: [Math.random()*0.5, Math.random()*0.5, 0],
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    uid: currentUser.uid,
-                    displayName: currentUser.isAnonymous ? "Guest" : (currentUser.displayName || currentUser.email.split('@')[0]),
-                    timestamp: serverTimestamp()
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'memories'), {
+                    text: txt,
+                    image: selectedImg,
+                    pos: [rad * Math.sin(phi) * Math.cos(theta), rad * Math.sin(phi) * Math.sin(theta), rad * Math.cos(phi)],
+                    rot: [Math.random() * 0.5, Math.random() * 0.5, 0],
+                    color: ["#ffffff", "#eff6ff", "#fdf4ff", "#fff7ed"][Math.floor(Math.random() * 4)],
+                    author: auth.currentUser.isAnonymous ? "Guest" : (auth.currentUser.displayName || auth.currentUser.email.split('@')[0]),
+                    time: serverTimestamp()
                 });
-
+                
                 document.getElementById('note-text').value = '';
-                removeImage();
-                closeAddModal();
-
-            } catch (e) {
-                console.error(e);
-                alert("Failed to post note: " + e.message);
+                window.removeImg();
+                window.toggleModal('add-modal', false);
+            } catch(e) {
+                alert("Error: " + e.message);
             } finally {
-                btn.innerText = 'Post';
-                btn.disabled = false;
+                btn.disabled = false; btn.innerText = "Post";
             }
         };
+
+        window.onload = startApp;
     </script>
 </body>
 </html>
