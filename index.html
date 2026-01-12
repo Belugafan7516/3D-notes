@@ -25,7 +25,6 @@
             z-index: 100; display: flex; flex-direction: column;
             align-items: center; justify-content: center; color: #6366f1;
         }
-        /* Fix for iOS momentum scrolling */
         .overflow-y-auto { -webkit-overflow-scrolling: touch; }
     </style>
     <script type="importmap">
@@ -42,7 +41,7 @@
     <div id="loader">
         <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
         <p class="text-sm font-mono tracking-widest uppercase">Initializing Void...</p>
-        <div id="error-display" class="hidden mt-6 p-4 bg-red-900/20 border border-red-500/50 text-red-400 text-xs max-w-xs rounded"></div>
+        <div id="error-display" class="hidden mt-6 p-4 bg-red-900/20 border border-red-500/50 text-red-400 text-xs max-w-xs rounded break-words font-mono"></div>
     </div>
 
     <div id="canvas-container"></div>
@@ -143,7 +142,6 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
         import { 
             getAuth, 
             signInWithEmailAndPassword, 
@@ -158,7 +156,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
         // --- GLOBAL STATE ---
-        let db, auth, appId, analytics;
+        let db, auth, appId;
         let scene, camera, renderer, controls, raycaster, pointer;
         let noteMeshes = [];
         let isLogin = true;
@@ -167,7 +165,7 @@
         // --- UTILS ---
         const showError = (msg) => {
             const d = document.getElementById('error-display');
-            d.innerHTML = msg; d.classList.remove('hidden');
+            d.innerText = msg; d.classList.remove('hidden');
         };
 
         window.toggleModal = (id, show) => {
@@ -178,7 +176,7 @@
         // --- FIREBASE INIT ---
         const startApp = async () => {
             try {
-                // Config provided by user
+                // HARDCODED CONFIGURATION
                 const firebaseConfig = {
                   apiKey: "AIzaSyAA4jqsD09nt69uSDwIVib11CsxwHMi7VM",
                   authDomain: "d-notes-9f1c2.firebaseapp.com",
@@ -189,10 +187,9 @@
                   measurementId: "G-Z8VLEW5D3X"
                 };
                 
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'd-notes-9f1c2';
+                appId = firebaseConfig.projectId; // Use projectId as appId
                 
                 const app = initializeApp(firebaseConfig);
-                analytics = getAnalytics(app);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
@@ -216,20 +213,13 @@
                     }
                 };
 
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token).catch(() => signInAnonymously(auth));
-                } else {
-                    // Start in anonymous mode if no user interaction yet, or wait for login
-                     onAuthStateChanged(auth, (user) => {
-                         if (!user) {
-                             // Optional: Auto sign-in anonymously or wait for user action
-                             // signInAnonymously(auth).catch(e => console.warn("Anon login failed", e));
-                         }
-                     });
-                }
-
+                // Handle initial auth or wait for user
+                // We do NOT use __initial_auth_token since we are using hardcoded config now
+                // We rely on onAuthStateChanged to detect if user is already logged in or not
+                
                 init3D();
                 setupAuthListener();
+                
                 document.getElementById('loader').style.opacity = '0';
                 setTimeout(() => {
                     document.getElementById('loader').style.display = 'none';
@@ -400,6 +390,7 @@
                             <i class="fas fa-right-from-bracket ml-1 opacity-50"></i>
                         </div>
                     `;
+                    // Fetch Data - Using standardized path for stability
                     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'memories'));
                     onSnapshot(q, (snap) => {
                         noteMeshes.forEach(m => scene.remove(m));
