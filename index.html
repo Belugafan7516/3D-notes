@@ -108,7 +108,6 @@
 
     <!-- VIEW MODAL -->
     <div id="view-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-        <!-- Background click removed for strict closing -->
         <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
             <button onclick="toggleModal('view-modal', false)" class="absolute top-4 right-4 bg-black/10 hover:bg-black/20 w-10 h-10 rounded-full flex items-center justify-center text-slate-800 transition-all z-20">
                 <i class="fas fa-xmark"></i>
@@ -144,6 +143,7 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
         import { 
             getAuth, 
             signInWithEmailAndPassword, 
@@ -158,7 +158,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
         // --- GLOBAL STATE ---
-        let db, auth, appId;
+        let db, auth, appId, analytics;
         let scene, camera, renderer, controls, raycaster, pointer;
         let noteMeshes = [];
         let isLogin = true;
@@ -178,13 +178,21 @@
         // --- FIREBASE INIT ---
         const startApp = async () => {
             try {
-                const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                if (!configStr) throw new Error("Firebase configuration not found in environment.");
+                // Config provided by user
+                const firebaseConfig = {
+                  apiKey: "AIzaSyAA4jqsD09nt69uSDwIVib11CsxwHMi7VM",
+                  authDomain: "d-notes-9f1c2.firebaseapp.com",
+                  projectId: "d-notes-9f1c2",
+                  storageBucket: "d-notes-9f1c2.firebasestorage.app",
+                  messagingSenderId: "1036407764719",
+                  appId: "1:1036407764719:web:ce2912979ea82f21f6cd1a",
+                  measurementId: "G-Z8VLEW5D3X"
+                };
                 
-                const firebaseConfig = typeof configStr === 'string' ? JSON.parse(configStr) : configStr;
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'guestbook-app';
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'd-notes-9f1c2';
                 
                 const app = initializeApp(firebaseConfig);
+                analytics = getAnalytics(app);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
@@ -211,7 +219,13 @@
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token).catch(() => signInAnonymously(auth));
                 } else {
-                    await signInAnonymously(auth).catch(e => console.warn("Anon login failed", e));
+                    // Start in anonymous mode if no user interaction yet, or wait for login
+                     onAuthStateChanged(auth, (user) => {
+                         if (!user) {
+                             // Optional: Auto sign-in anonymously or wait for user action
+                             // signInAnonymously(auth).catch(e => console.warn("Anon login failed", e));
+                         }
+                     });
                 }
 
                 init3D();
@@ -251,7 +265,7 @@
             controls.enableDamping = true;
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.5;
-            controls.enablePan = true; // Enabled panning for movement
+            controls.enablePan = true;
             controls.minDistance = 5;
             controls.maxDistance = 25;
 
@@ -275,7 +289,7 @@
             // Improved Touch/Click handling
             let isDragging = false;
             let mouseDownTime = 0;
-            const threshold = 200; // ms to distinguish click from drag
+            const threshold = 200;
 
             renderer.domElement.addEventListener('pointerdown', () => {
                 isDragging = false;
@@ -288,7 +302,6 @@
 
             renderer.domElement.addEventListener('pointerup', (e) => {
                 const timeDiff = Date.now() - mouseDownTime;
-                // Only consider it a click if it was a short press and minimal movement
                 if (timeDiff < threshold) {
                     pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
                     pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
