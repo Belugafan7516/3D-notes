@@ -41,26 +41,44 @@
 </head>
 <body>
 
+    <!-- Loading Screen -->
     <div id="loader">
         <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
         <p class="text-xs font-mono tracking-widest uppercase text-gray-400">Initializing Memory...</p>
         <div id="startup-error" class="hidden mt-4 text-red-400 font-mono text-[10px] bg-red-900/20 p-3 rounded border border-red-500/30 max-w-xs text-center"></div>
     </div>
 
+    <!-- 3D Canvas -->
     <div id="canvas-container"></div>
 
+    <!-- UI Overlay -->
     <div id="ui-layer" class="flex flex-col justify-between p-4 sm:p-6 opacity-0 transition-opacity duration-1000" id="main-ui">
+        <!-- Header -->
         <div class="flex justify-between items-start">
-            <div class="interactive bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-xl">
-                <h1 class="text-white font-bold tracking-tighter text-lg">LIVING MEMORY</h1>
+            <div class="flex items-center gap-2">
+                <div class="interactive bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-xl">
+                    <h1 class="text-white font-bold tracking-tighter text-lg">LIVING MEMORY</h1>
+                </div>
+                <!-- Admin Button (Hidden by default) -->
+                <button id="admin-trigger" onclick="window.app.toggleModal('admin-modal', true)" class="hidden interactive bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white px-3 py-2 rounded-full border border-red-500/50 transition-all">
+                    <i class="fas fa-shield-halved"></i>
+                </button>
             </div>
-            <div id="auth-status" class="interactive"></div>
+            
+            <div class="flex items-center gap-2">
+                <div id="announcement-bell" class="hidden interactive bg-yellow-500/20 text-yellow-400 p-2 rounded-full border border-yellow-500/50 cursor-pointer hover:bg-yellow-500 hover:text-black transition-all" onclick="window.app.toggleModal('news-modal', true)">
+                    <i class="fas fa-bullhorn"></i>
+                </div>
+                <div id="auth-status" class="interactive"></div>
+            </div>
         </div>
 
+        <!-- Instructions -->
         <div class="text-center text-white/30 text-[10px] mb-20 pointer-events-none uppercase tracking-widest font-medium">
             Drag to Rotate • Pinch to Zoom • Tap Card
         </div>
 
+        <!-- FAB (Add) -->
         <div id="fab-container" class="absolute bottom-8 left-0 right-0 flex justify-center interactive hidden">
             <button onclick="window.app.toggleModal('add-modal', true)" class="bg-indigo-600 hover:bg-indigo-500 text-white w-16 h-16 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center transition-transform active:scale-90 group">
                 <i class="fas fa-plus text-2xl group-hover:rotate-90 transition-transform"></i>
@@ -104,7 +122,7 @@
         </div>
     </div>
 
-    <!-- VIEW MODAL -->
+    <!-- VIEW NOTE MODAL -->
     <div id="view-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
         <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
             <button onclick="window.app.toggleModal('view-modal', false)" class="absolute top-4 right-4 bg-black/10 hover:bg-black/20 w-10 h-10 rounded-full flex items-center justify-center text-slate-800 transition-all z-20">
@@ -114,7 +132,68 @@
         </div>
     </div>
 
-    <!-- ADD MODAL -->
+    <!-- ADMIN PANEL MODAL -->
+    <div id="admin-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <div class="bg-slate-900 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-slate-700 relative z-50 flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+                <h3 class="text-white font-bold tracking-widest text-sm uppercase"><i class="fas fa-terminal mr-2 text-red-500"></i> Admin Console</h3>
+                <button onclick="window.app.toggleModal('admin-modal', false)" class="text-slate-400 hover:text-white"><i class="fas fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto space-y-8">
+                <!-- Backup/Restore -->
+                <div>
+                    <h4 class="text-slate-400 text-xs font-bold uppercase mb-3">Data Management</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="window.app.admin.exportData()" class="bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl text-sm font-medium border border-slate-600">
+                            <i class="fas fa-download mr-2"></i> Export JSON
+                        </button>
+                        <div class="relative">
+                            <button class="w-full bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl text-sm font-medium border border-slate-600">
+                                <i class="fas fa-upload mr-2"></i> Import JSON
+                            </button>
+                            <input type="file" onchange="window.app.admin.importData(event)" class="absolute inset-0 opacity-0 cursor-pointer" accept=".json">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Announcements -->
+                <div>
+                    <h4 class="text-slate-400 text-xs font-bold uppercase mb-3">Broadcast</h4>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <input id="announce-title" placeholder="Title" class="w-full bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded-lg text-sm mb-2 focus:border-indigo-500 outline-none">
+                        <textarea id="announce-msg" placeholder="Message to all users..." class="w-full bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded-lg text-sm mb-3 focus:border-indigo-500 outline-none h-20"></textarea>
+                        <button onclick="window.app.admin.sendAnnouncement()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold">Send Announcement</button>
+                    </div>
+                </div>
+
+                <!-- Banned Users -->
+                <div>
+                    <h4 class="text-slate-400 text-xs font-bold uppercase mb-3">Banned Users</h4>
+                    <div id="banned-list" class="bg-slate-800 rounded-xl border border-slate-700 max-h-40 overflow-y-auto p-2 space-y-2">
+                        <p class="text-slate-500 text-xs text-center p-2">Loading banned users...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEWS MODAL -->
+    <div id="news-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border-t-4 border-yellow-400">
+            <button onclick="window.app.toggleModal('news-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fas fa-xmark text-xl"></i>
+            </button>
+            <div class="text-yellow-500 text-4xl mb-4 text-center"><i class="fas fa-bullhorn"></i></div>
+            <h2 id="news-title" class="text-2xl font-bold text-slate-900 mb-2 text-center">No News</h2>
+            <p id="news-body" class="text-slate-600 text-sm leading-relaxed text-center">There are no announcements at this time.</p>
+            <div class="mt-6 text-center">
+                <button onclick="window.app.toggleModal('news-modal', false)" class="text-sm font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD NOTE MODAL -->
     <div id="add-modal" class="modal fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm">
         <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[95vh] relative">
             <div class="p-4 border-b flex justify-between items-center">
@@ -157,10 +236,14 @@
             collection, 
             addDoc, 
             deleteDoc,
+            setDoc,
             doc,
+            getDocs,
             onSnapshot, 
             serverTimestamp, 
-            query 
+            query,
+            orderBy,
+            limit
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
         // --- CONFIG ---
@@ -175,20 +258,26 @@
         };
 
         const APP_UID = firebaseConfig.projectId;
+        const ADMINS = ['admin@eugeneevons.com', 'leeeugene1574@gmail.com'];
 
         // --- STATE ---
         const state = {
             app: null, auth: null, db: null, user: null,
             isLoginMode: true, selectedImg: null,
             scene: null, camera: null, renderer: null,
-            noteMeshes: [], raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2()
+            noteMeshes: [], raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2(),
+            isAdmin: false
         };
 
         // --- EXPORTS ---
         window.app = {
             toggleModal: (id, show) => {
                 const el = document.getElementById(id);
-                if(el) el.classList.toggle('active', show);
+                if(el) {
+                    el.classList.toggle('active', show);
+                    // Refresh banned list when opening admin
+                    if(id === 'admin-modal' && show) window.app.admin.refreshBans();
+                }
             },
             
             toggleAuthMode: () => {
@@ -255,14 +344,122 @@
                 try { await signOut(state.auth); } catch(e) { console.error(e); }
             },
 
-            deleteNote: async (docId) => {
-                if(!confirm("Delete this memory?")) return;
+            // --- ADMIN ACTIONS ---
+            admin: {
+                deleteNote: async (docId) => {
+                    if(!confirm("Permanently delete this note?")) return;
+                    try {
+                        await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId));
+                        window.app.toggleModal('view-modal', false);
+                    } catch (e) { alert(e.message); }
+                },
+
+                banUser: async (uid) => {
+                    if(!confirm(`Ban user ${uid}? They will not be able to post.`)) return;
+                    try {
+                        await setDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users', uid), {
+                            bannedAt: serverTimestamp(),
+                            bannedBy: state.user.email
+                        });
+                        alert("User Banned");
+                        window.app.toggleModal('view-modal', false);
+                    } catch (e) { alert("Ban Failed: " + e.message); }
+                },
+
+                unbanUser: async (uid) => {
+                    if(!confirm("Unban user?")) return;
+                    try {
+                        await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users', uid));
+                        window.app.admin.refreshBans();
+                    } catch (e) { alert(e.message); }
+                },
+
+                refreshBans: async () => {
+                    const list = document.getElementById('banned-list');
+                    list.innerHTML = '<p class="text-slate-500 text-xs text-center">Loading...</p>';
+                    try {
+                        const snap = await getDocs(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users'));
+                        if(snap.empty) {
+                            list.innerHTML = '<p class="text-slate-500 text-xs text-center">No banned users.</p>';
+                            return;
+                        }
+                        list.innerHTML = '';
+                        snap.forEach(d => {
+                            const div = document.createElement('div');
+                            div.className = "flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700";
+                            div.innerHTML = `
+                                <span class="text-white text-xs font-mono truncate w-32">${d.id}</span>
+                                <button onclick="window.app.admin.unbanUser('${d.id}')" class="text-green-400 hover:text-green-300 text-xs uppercase font-bold">Unban</button>
+                            `;
+                            list.appendChild(div);
+                        });
+                    } catch (e) { list.innerText = "Error loading bans."; }
+                },
+
+                exportData: async () => {
+                    try {
+                        const snap = await getDocs(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'));
+                        const data = [];
+                        snap.forEach(d => data.push({id: d.id, ...d.data()}));
+                        const blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = `echoes_backup_${new Date().toISOString().split('T')[0]}.json`;
+                        a.click();
+                    } catch (e) { alert("Export Failed: " + e.message); }
+                },
+
+                importData: (e) => {
+                    const file = e.target.files[0];
+                    if(!file) return;
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                        try {
+                            const data = JSON.parse(ev.target.result);
+                            if(!Array.isArray(data)) throw new Error("Invalid format");
+                            if(!confirm(`Import ${data.length} memories? This cannot be undone.`)) return;
+                            
+                            let count = 0;
+                            for(const note of data) {
+                                // Strip ID to create new docs
+                                const { id, ...rest } = note; 
+                                await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'), {
+                                    ...rest,
+                                    time: serverTimestamp() // Reset time or keep original? Resetting safer for sort.
+                                });
+                                count++;
+                            }
+                            alert(`Imported ${count} memories.`);
+                        } catch (err) { alert("Import Failed: " + err.message); }
+                    };
+                    reader.readAsText(file);
+                },
+
+                sendAnnouncement: async () => {
+                    const title = document.getElementById('announce-title').value;
+                    const msg = document.getElementById('announce-msg').value;
+                    if(!title || !msg) return alert("Title and Message required");
+                    
+                    try {
+                        await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'announcements'), {
+                            title,
+                            message: msg,
+                            createdAt: serverTimestamp()
+                        });
+                        alert("Announcement Sent!");
+                        document.getElementById('announce-title').value = "";
+                        document.getElementById('announce-msg').value = "";
+                    } catch (e) { alert("Send failed: " + e.message); }
+                }
+            },
+
+            // --- NOTE ACTIONS ---
+            deleteSelf: async (docId) => {
+                if(!confirm("Delete your memory?")) return;
                 try {
                     await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId));
                     window.app.toggleModal('view-modal', false);
-                } catch (e) {
-                    alert("Delete Failed: " + e.message);
-                }
+                } catch (e) { alert(e.message); }
             },
 
             previewFile: (e) => {
@@ -313,7 +510,7 @@
                         rot: [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, 0],
                         color: ["#ffffff", "#fef3c7", "#e0f2fe", "#fce7f3"][Math.floor(Math.random()*4)],
                         author: state.user.isAnonymous ? "Guest" : (state.user.displayName || state.user.email.split('@')[0]),
-                        uid: state.user.uid, // SAVING UID FOR SECURITY RULES
+                        uid: state.user.uid,
                         time: serverTimestamp()
                     });
                     
@@ -321,7 +518,7 @@
                     window.app.removeImg();
                     window.app.toggleModal('add-modal', false);
                 } catch (e) {
-                    alert("Post failed: " + e.message);
+                    alert("Post failed. You may be banned or not logged in.");
                 } finally {
                     btn.disabled = false; btn.innerText = "Post";
                 }
@@ -339,11 +536,17 @@
 
                 onAuthStateChanged(state.auth, (user) => {
                     state.user = user;
+                    state.isAdmin = user && user.email && ADMINS.includes(user.email);
+                    
                     const status = document.getElementById('auth-status');
                     const fab = document.getElementById('fab-container');
+                    const adminBtn = document.getElementById('admin-trigger');
 
                     if (user) {
                         fab.classList.remove('hidden');
+                        if (state.isAdmin) adminBtn.classList.remove('hidden');
+                        else adminBtn.classList.add('hidden');
+
                         const name = user.isAnonymous ? 'Guest' : (user.displayName || user.email.split('@')[0]);
                         status.innerHTML = `
                              <div onclick="window.app.signOut()" class="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-[10px] font-bold tracking-widest uppercase border border-white/10 flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-all shadow-xl active:scale-95">
@@ -353,16 +556,36 @@
                             </div>
                         `;
                         
+                        // Listen for Memories
                         const q = query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'));
                         onSnapshot(q, (snap) => {
                             state.noteMeshes.forEach(m => state.scene.remove(m));
                             state.noteMeshes = [];
                             snap.docs.forEach(d => createNote(d));
-                        }, (err) => {
-                            console.error("Firestore Error:", err);
                         });
+
+                        // Listen for Announcements
+                        const announceQ = query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'announcements'), orderBy('createdAt', 'desc'), limit(1));
+                        onSnapshot(announceQ, (snap) => {
+                            if (!snap.empty) {
+                                const latest = snap.docs[0].data();
+                                const bell = document.getElementById('announcement-bell');
+                                bell.classList.remove('hidden');
+                                document.getElementById('news-title').innerText = latest.title;
+                                document.getElementById('news-body').innerText = latest.message;
+                                
+                                // Auto-show if new (simple check via localStorage)
+                                const lastSeen = localStorage.getItem('last_news_id');
+                                if (lastSeen !== snap.docs[0].id) {
+                                    window.app.toggleModal('news-modal', true);
+                                    localStorage.setItem('last_news_id', snap.docs[0].id);
+                                }
+                            }
+                        });
+
                     } else {
                         fab.classList.add('hidden');
+                        adminBtn.classList.add('hidden');
                         status.innerHTML = `<button onclick="window.app.toggleModal('auth-modal', true)" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Login</button>`;
                     }
                 });
@@ -380,7 +603,7 @@
         // --- 3D HELPERS ---
         function init3D() {
             state.scene = new THREE.Scene();
-            state.scene.fog = new THREE.FogExp2(0x020617, 0.04);
+            state.scene.fog = new THREE.FogExp2(0x000000, 0.04);
             
             state.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
             state.camera.position.set(0, 0, 16);
@@ -404,7 +627,7 @@
             state.scene.add(point);
             
             const starGeo = new THREE.BufferGeometry();
-            const starCount = 1000;
+            const starCount = 1500;
             const pos = new Float32Array(starCount*3);
             for(let i=0; i<starCount*3; i++) pos[i] = (Math.random()-0.5)*60;
             starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -486,8 +709,6 @@
         }
 
         function openView(note, docId) {
-            // Check if current user is admin or owner
-            const isAdmin = state.user && ['admin@eugeneevons.com', 'leeeugene1574@gmail.com'].includes(state.user.email);
             const isOwner = state.user && state.user.uid === note.uid;
             
             const body = document.getElementById('view-body');
@@ -502,7 +723,11 @@
                                 <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">${note.time ? new Date(note.time.seconds * 1000).toLocaleDateString() : 'Now'}</p>
                             </div>
                         </div>
-                        ${(isAdmin || isOwner) ? `<button onclick="window.app.deleteNote('${docId}')" class="text-red-400 hover:text-red-600 text-xs font-bold uppercase border border-red-200 px-3 py-1 rounded-full">Delete</button>` : ''}
+                        <div class="flex gap-2">
+                            ${(state.isAdmin) ? `<button onclick="window.app.admin.banUser('${note.uid}')" class="text-red-500 bg-red-50 hover:bg-red-100 text-xs font-bold uppercase px-3 py-1 rounded-lg">Ban User</button>` : ''}
+                            ${(state.isAdmin) ? `<button onclick="window.app.admin.deleteNote('${docId}')" class="text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs font-bold uppercase px-3 py-1 rounded-lg">Admin Del</button>` : ''}
+                            ${(isOwner && !state.isAdmin) ? `<button onclick="window.app.deleteSelf('${docId}')" class="text-red-400 hover:text-red-600 text-xs font-bold uppercase border border-red-200 px-3 py-1 rounded-full">Delete</button>` : ''}
+                        </div>
                     </div>
                     <p class="text-xl text-slate-800 font-serif leading-relaxed italic">"${note.text}"</p>
                 </div>
