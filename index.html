@@ -2,516 +2,517 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Void Guestbook</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Living Memory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        :root {
-            --primary: #6C63FF;
-            --glass: rgba(255, 255, 255, 0.08);
-            --glass-border: rgba(255, 255, 255, 0.15);
-            --text: #ffffff;
-            --bg: #050508;
+        body { margin: 0; overflow: hidden; background: #000000; font-family: sans-serif; touch-action: none; }
+        #canvas-container { position: absolute; inset: 0; z-index: 0; }
+        #ui-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+        .interactive { pointer-events: auto; }
+        .modal { 
+            visibility: hidden; opacity: 0; 
+            transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+            transform: scale(0.95);
         }
-
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: var(--bg); 
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            color: var(--text);
+        .modal.active { 
+            visibility: visible; opacity: 1; 
+            transform: scale(1);
         }
-
-        #canvas-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            z-index: 1;
+        #loader {
+            position: fixed; inset: 0; background: #000000; 
+            z-index: 100; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: #6366f1;
         }
-
-        #ui-layer {
-            position: absolute;
-            z-index: 10;
-            padding: 20px;
-            pointer-events: none;
-            width: 100%;
-            height: 100%;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .hud-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            pointer-events: auto;
-        }
-
-        .hud-bottom {
-            display: flex;
-            justify-content: center;
-            pointer-events: auto;
-            margin-bottom: 20px;
-        }
-
-        .title-group h2 {
-            margin: 0;
-            font-size: 1.5rem;
-            letter-spacing: -0.5px;
-        }
-
-        .title-group p {
-            margin: 4px 0 0;
-            font-size: 0.8rem;
-            opacity: 0.6;
-        }
-
-        button {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
-        }
-
-        button:hover { 
-            transform: translateY(-2px);
-            background: #7e77ff;
-            box-shadow: 0 6px 20px rgba(108, 99, 255, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        button.secondary {
-            background: rgba(255,255,255,0.1);
-            box-shadow: none;
-        }
-
-        .glass-panel {
-            background: var(--glass);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            padding: 24px;
-            border-radius: 20px;
-            border: 1px solid var(--glass-border);
-            pointer-events: auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        #auth-modal, #note-modal {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            max-width: 360px;
-            text-align: center;
-        }
-
-        .active { display: block !important; }
-
-        textarea {
-            width: 100%;
-            padding: 15px;
-            margin: 15px 0;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: white;
-            border-radius: 12px;
-            box-sizing: border-box;
-            font-family: inherit;
-            font-size: 1rem;
-            resize: none;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.8rem;
-            background: rgba(0,0,0,0.3);
-            padding: 6px 12px;
-            border-radius: 20px;
-        }
-
-        .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #444;
-        }
-
-        .dot.online { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
-
-        #toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--primary);
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            z-index: 100;
-        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 3px; }
     </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 <body>
 
+    <div id="loader">
+        <i class="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
+        <p class="text-xs font-mono tracking-widest uppercase text-gray-400">Initializing Memory...</p>
+        <div id="startup-error" class="hidden mt-4 text-red-400 font-mono text-[10px] bg-red-900/20 p-3 rounded border border-red-500/30 max-w-xs text-center"></div>
+    </div>
+
     <div id="canvas-container"></div>
 
-    <div id="ui-layer">
-        <div class="hud-top">
-            <div class="title-group">
-                <h2>✨ Void Notes</h2>
-                <p>Drag to look, scroll to zoom</p>
+    <div id="ui-layer" class="flex flex-col justify-between p-4 sm:p-6 opacity-0 transition-opacity duration-1000" id="main-ui">
+        <div class="flex justify-between items-start">
+            <div class="interactive bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-xl">
+                <h1 class="text-white font-bold tracking-tighter text-lg">LIVING MEMORY</h1>
             </div>
-            <div id="user-info" class="pointer-events-auto">
-                <div class="status-indicator">
-                    <div id="status-dot" class="dot"></div>
-                    <span id="status-text">Connecting...</span>
-                </div>
+            <div id="auth-status" class="interactive"></div>
+        </div>
+
+        <div class="text-center text-white/30 text-[10px] mb-20 pointer-events-none uppercase tracking-widest font-medium">
+            Drag to Rotate • Pinch to Zoom • Tap Card
+        </div>
+
+        <div id="fab-container" class="absolute bottom-8 left-0 right-0 flex justify-center interactive hidden">
+            <button onclick="window.app.toggleModal('add-modal', true)" class="bg-indigo-600 hover:bg-indigo-500 text-white w-16 h-16 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center transition-transform active:scale-90 group">
+                <i class="fas fa-plus text-2xl group-hover:rotate-90 transition-transform"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- AUTH MODAL -->
+    <div id="auth-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl relative">
+            <button onclick="window.app.toggleModal('auth-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i class="fas fa-xmark text-xl"></i>
+            </button>
+
+            <h2 id="auth-title" class="text-2xl font-bold text-slate-900 mb-2">Join</h2>
+            <p class="text-slate-500 text-sm mb-6">Leave your mark in the void.</p>
+            
+            <div id="auth-error" class="hidden mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 break-words"></div>
+
+            <button onclick="window.app.handleGoogle()" class="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-3 mb-4 shadow-sm active:scale-95">
+                <i class="fab fa-google text-red-500 text-lg"></i>
+                <span>Continue with Google</span>
+            </button>
+
+            <div class="flex items-center gap-4 py-2 mb-4">
+                <div class="flex-1 border-t border-slate-100"></div>
+                <span class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Or Email</span>
+                <div class="flex-1 border-t border-slate-100"></div>
             </div>
-        </div>
 
-        <div class="hud-bottom">
-            <button id="btn-login" class="hidden">Login to Post</button>
-            <button id="btn-add-note" style="display:none;">+ Leave a Note</button>
-        </div>
+            <form onsubmit="window.app.handleEmailAuth(event)" class="space-y-4">
+                <input type="email" id="email" placeholder="Email" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm" required>
+                <input type="password" id="password" placeholder="Password" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm" required>
+                <button type="submit" id="auth-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95">Sign In</button>
+            </form>
 
-        <!-- Single Auth Modal (Simplified for the environment) -->
-        <div id="auth-modal" class="glass-panel">
-            <h3>Enter the Space</h3>
-            <p style="font-size: 0.85rem; opacity: 0.7; margin-bottom: 20px;">Choose how you'd like to identify your notes in the collective void.</p>
-            <button id="btn-signin-anon" style="width: 100%; margin-bottom: 10px;">Enter Anonymously</button>
-            <button id="btn-close-auth" class="secondary" style="width: 100%;">Maybe Later</button>
-        </div>
-
-        <div id="note-modal" class="glass-panel">
-            <h3>Write to the Void</h3>
-            <textarea id="note-content" rows="4" maxlength="120" placeholder="What's on your mind?"></textarea>
-            <div style="display: flex; gap: 10px;">
-                <button id="btn-submit-note" style="flex: 2;">Pin Note</button>
-                <button id="btn-close-note" class="secondary" style="flex: 1;">Cancel</button>
+            <div class="mt-6 space-y-3">
+                <button onclick="window.app.toggleAuthMode()" id="toggle-auth" class="w-full text-center text-sm text-indigo-600 font-semibold hover:underline">Need an account? Sign Up</button>
+                <button onclick="window.app.handleGuest()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95">Continue as Guest</button>
             </div>
         </div>
     </div>
 
-    <div id="toast">Pinned to space!</div>
+    <!-- VIEW MODAL -->
+    <div id="view-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
+            <button onclick="window.app.toggleModal('view-modal', false)" class="absolute top-4 right-4 bg-black/10 hover:bg-black/20 w-10 h-10 rounded-full flex items-center justify-center text-slate-800 transition-all z-20">
+                <i class="fas fa-xmark"></i>
+            </button>
+            <div id="view-body" class="overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- ADD MODAL -->
+    <div id="add-modal" class="modal fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[95vh] relative">
+            <div class="p-4 border-b flex justify-between items-center">
+                <button onclick="window.app.toggleModal('add-modal', false)" class="text-slate-400 p-2"><i class="fas fa-xmark text-xl"></i></button>
+                <span class="font-bold text-slate-800 uppercase tracking-widest text-[10px]">Add Memory</span>
+                <button onclick="window.app.submitNote()" id="post-btn" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm disabled:opacity-50 active:scale-95 transition-transform shadow-lg">Post</button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <textarea id="note-text" placeholder="What's on your mind?" class="w-full h-40 p-0 text-xl text-slate-800 border-none resize-none focus:ring-0 placeholder:text-slate-300 outline-none"></textarea>
+                <div id="img-preview-box" class="hidden relative mt-4 rounded-2xl overflow-hidden border border-slate-100">
+                    <img id="img-preview" class="w-full h-auto max-h-60 object-cover bg-black">
+                    <button onclick="window.app.removeImg()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg"><i class="fas fa-trash-can text-xs"></i></button>
+                </div>
+                <div id="img-trigger" onclick="document.getElementById('file-in').click()" class="mt-4 p-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all text-slate-400">
+                    <i class="fas fa-camera text-2xl"></i>
+                    <span class="text-[10px] font-bold uppercase">Add Photo</span>
+                </div>
+                <input type="file" id="file-in" class="hidden" accept="image/*" onchange="window.app.previewFile(event)">
+            </div>
+        </div>
+    </div>
 
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            createUserWithEmailAndPassword, 
+            signInAnonymously, 
+            onAuthStateChanged, 
+            signOut, 
+            GoogleAuthProvider,
+            signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            deleteDoc,
+            doc,
+            onSnapshot, 
+            serverTimestamp, 
+            query 
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-        // --- ENVIRONMENT CONFIG ---
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'void-notes-default';
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        let currentUser = null;
+        // --- CONFIG ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBq2cfJczX5G-7QVkB2LJZuFM3n6Z24ipE",
+          authDomain: "just-a-living-memory.firebaseapp.com",
+          projectId: "just-a-living-memory",
+          storageBucket: "just-a-living-memory.firebasestorage.app",
+          messagingSenderId: "254236060633",
+          appId: "1:254236060633:web:8e781d3df38a260f0747c8",
+          measurementId: "G-DVH8D97J7D"
+        };
 
-        // --- THREE.JS SCENE SETUP ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050508);
-        scene.fog = new THREE.FogExp2(0x050508, 0.035);
+        const APP_UID = firebaseConfig.projectId;
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 5, 18);
+        // --- STATE ---
+        const state = {
+            app: null, auth: null, db: null, user: null,
+            isLoginMode: true, selectedImg: null,
+            scene: null, camera: null, renderer: null,
+            noteMeshes: [], raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2()
+        };
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.4;
-        controls.maxDistance = 40;
-        controls.minDistance = 5;
-
-        // Lighting
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const pLight = new THREE.PointLight(0x6C63FF, 2, 50);
-        pLight.position.set(10, 10, 10);
-        scene.add(pLight);
-
-        // Starfield
-        const starGeo = new THREE.BufferGeometry();
-        const starCount = 4000;
-        const starPos = new Float32Array(starCount * 3);
-        for(let i=0; i<starCount*3; i++) {
-            starPos[i] = (Math.random() - 0.5) * 150;
-        }
-        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.6 });
-        const stars = new THREE.Points(starGeo, starMat);
-        scene.add(stars);
-
-        // Core Void Object
-        const coreGeo = new THREE.IcosahedronGeometry(2, 2);
-        const coreMat = new THREE.MeshStandardMaterial({ 
-            color: 0x6C63FF, 
-            wireframe: true, 
-            transparent: true, 
-            opacity: 0.1 
-        });
-        const core = new THREE.Mesh(coreGeo, coreMat);
-        scene.add(core);
-
-        // Note Rendering
-        const notesGroup = new THREE.Group();
-        scene.add(notesGroup);
-        const notesMap = new Map(); // Keep track of meshes to avoid flickering
-
-        function createNoteTexture(message, author) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-
-            // Draw Sticky Note with gradient
-            const grad = ctx.createLinearGradient(0,0,512,512);
-            grad.addColorStop(0, '#fff9c4');
-            grad.addColorStop(1, '#fdd835');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, 512, 512);
-
-            // Shadow/Border effect
-            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-            ctx.lineWidth = 20;
-            ctx.strokeRect(0, 0, 512, 512);
-
-            ctx.fillStyle = '#1a1a1a';
-            ctx.font = 'bold 38px Inter, Arial';
-            ctx.textAlign = 'center';
+        // --- EXPORTS ---
+        window.app = {
+            toggleModal: (id, show) => {
+                const el = document.getElementById(id);
+                if(el) el.classList.toggle('active', show);
+            },
             
-            const words = message.split(' ');
-            let line = '';
-            let y = 140;
-            
-            for(let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' ';
-                if (ctx.measureText(testLine).width > 420 && n > 0) {
-                    ctx.fillText(line, 256, y);
-                    line = words[n] + ' ';
-                    y += 50;
-                } else {
-                    line = testLine;
+            toggleAuthMode: () => {
+                state.isLoginMode = !state.isLoginMode;
+                document.getElementById('auth-title').innerText = state.isLoginMode ? "Join" : "Sign Up";
+                document.getElementById('auth-btn').innerText = state.isLoginMode ? "Sign In" : "Create Account";
+                document.getElementById('toggle-auth').innerText = state.isLoginMode ? "Need an account? Sign Up" : "Have an account? Sign In";
+                document.getElementById('auth-error').classList.add('hidden');
+            },
+
+            handleGoogle: async () => {
+                const err = document.getElementById('auth-error');
+                err.classList.add('hidden');
+                try {
+                    await signInWithPopup(state.auth, new GoogleAuthProvider());
+                    window.app.toggleModal('auth-modal', false);
+                } catch (e) {
+                    console.error(e);
+                    err.innerText = e.message.replace("Firebase: ", "");
+                    err.classList.remove('hidden');
                 }
-            }
-            ctx.fillText(line, 256, y);
+            },
 
-            ctx.font = 'italic 28px Inter, Arial';
-            ctx.fillStyle = '#666';
-            ctx.fillText(`— ${author}`, 256, 460);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-            return texture;
-        }
-
-        function syncNotes(snapshot) {
-            // Remove notes that are no longer in the snapshot
-            const currentIds = new Set(snapshot.docs.map(doc => doc.id));
-            for (let [id, mesh] of notesMap) {
-                if (!currentIds.has(id)) {
-                    notesGroup.remove(mesh);
-                    notesMap.delete(id);
+            handleGuest: async () => {
+                const err = document.getElementById('auth-error');
+                try {
+                    err.classList.add('hidden');
+                    await signInAnonymously(state.auth);
+                    window.app.toggleModal('auth-modal', false);
+                } catch (e) {
+                    err.innerText = "Guest Error: " + e.message;
+                    err.classList.remove('hidden');
                 }
-            }
+            },
 
-            // Add or Update notes
-            snapshot.forEach((doc) => {
-                if (notesMap.has(doc.id)) return; // Already rendered
-
-                const data = doc.data();
-                const texture = createNoteTexture(data.text, data.author || 'Anon');
-                const geometry = new THREE.PlaneGeometry(3, 3);
-                const material = new THREE.MeshStandardMaterial({ 
-                    map: texture,
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    roughness: 0.5
-                });
-                const mesh = new THREE.Mesh(geometry, material);
-
-                // Use stored positions or generate if missing
-                if (data.pos) {
-                    mesh.position.set(data.pos.x, data.pos.y, data.pos.z);
-                } else {
-                    const r = 10 + Math.random() * 5;
-                    const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.acos((Math.random() * 2) - 1);
-                    mesh.position.set(
-                        r * Math.sin(phi) * Math.cos(theta),
-                        r * Math.sin(phi) * Math.sin(theta),
-                        r * Math.cos(phi)
-                    );
-                }
+            handleEmailAuth: async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const pass = document.getElementById('password').value;
+                const btn = document.getElementById('auth-btn');
+                const err = document.getElementById('auth-error');
                 
-                mesh.lookAt(0,0,0);
-                notesGroup.add(mesh);
-                notesMap.set(doc.id, mesh);
-            });
-        }
-
-        // --- FIREBASE LOGIC ---
-        async function startApp() {
-            // Rule 3: Auth First
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
+                err.classList.add('hidden');
+                btn.disabled = true;
+                btn.innerText = "Processing...";
+                
+                try {
+                    if (state.isLoginMode) {
+                        await signInWithEmailAndPassword(state.auth, email, pass);
+                    } else {
+                        await createUserWithEmailAndPassword(state.auth, email, pass);
+                    }
+                    window.app.toggleModal('auth-modal', false);
+                } catch (error) {
+                    err.innerText = error.message.replace("Firebase: ", "");
+                    err.classList.remove('hidden');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = state.isLoginMode ? "Sign In" : "Create Account";
                 }
-            } catch (err) {
-                console.error("Auth failed:", err);
-                document.getElementById('status-text').textContent = "Offline Mode";
-            }
+            },
 
-            onAuthStateChanged(auth, (user) => {
-                currentUser = user;
-                const statusDot = document.getElementById('status-dot');
-                const statusText = document.getElementById('status-text');
-                const loginBtn = document.getElementById('btn-login');
-                const addNoteBtn = document.getElementById('btn-add-note');
+            signOut: async () => {
+                try { await signOut(state.auth); } catch(e) { console.error(e); }
+            },
 
-                if (user) {
-                    statusDot.className = 'dot online';
-                    statusText.textContent = user.isAnonymous ? "Connected (Anon)" : "Connected";
-                    loginBtn.style.display = 'none';
-                    addNoteBtn.style.display = 'block';
+            deleteNote: async (docId) => {
+                if(!confirm("Delete this memory?")) return;
+                try {
+                    await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId));
+                    window.app.toggleModal('view-modal', false);
+                } catch (e) {
+                    alert("Delete Failed: " + e.message);
+                }
+            },
+
+            previewFile: (e) => {
+                const f = e.target.files[0];
+                if(!f) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.src = ev.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX = 640;
+                        let w = img.width, h = img.height;
+                        if(w>h) { if(w>MAX){h*=MAX/w; w=MAX}} else { if(h>MAX){w*=MAX/h; h=MAX}}
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        state.selectedImg = canvas.toDataURL('image/jpeg', 0.85);
+                        document.getElementById('img-preview').src = state.selectedImg;
+                        document.getElementById('img-preview-box').classList.remove('hidden');
+                        document.getElementById('img-trigger').classList.add('hidden');
+                    }
+                }
+                reader.readAsDataURL(f);
+            },
+
+            removeImg: () => {
+                state.selectedImg = null;
+                document.getElementById('img-preview-box').classList.add('hidden');
+                document.getElementById('img-trigger').classList.remove('hidden');
+                document.getElementById('file-in').value = "";
+            },
+
+            submitNote: async () => {
+                const txt = document.getElementById('note-text').value;
+                if(!txt.trim()) return;
+                const btn = document.getElementById('post-btn');
+                btn.disabled = true; btn.innerText = "...";
+
+                try {
+                    const rad = 10 + Math.random() * 5;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(Math.random() * 2 - 1);
                     
-                    // Start Listener (Rule 1: Strict Paths, Rule 2: Simple Query)
-                    const notesCol = collection(db, 'artifacts', appId, 'public', 'data', 'notes');
-                    onSnapshot(notesCol, syncNotes, (error) => {
-                        console.error("Firestore Listen Error:", error);
+                    await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'), {
+                        text: txt,
+                        image: state.selectedImg,
+                        pos: [rad * Math.sin(phi) * Math.cos(theta), rad * Math.sin(phi) * Math.sin(theta), rad * Math.cos(phi)],
+                        rot: [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, 0],
+                        color: ["#ffffff", "#fef3c7", "#e0f2fe", "#fce7f3"][Math.floor(Math.random()*4)],
+                        author: state.user.isAnonymous ? "Guest" : (state.user.displayName || state.user.email.split('@')[0]),
+                        uid: state.user.uid, // SAVING UID FOR SECURITY RULES
+                        time: serverTimestamp()
                     });
-                } else {
-                    statusDot.className = 'dot';
-                    statusText.textContent = "Sign in to post";
-                    loginBtn.style.display = 'block';
-                    addNoteBtn.style.display = 'none';
+                    
+                    document.getElementById('note-text').value = '';
+                    window.app.removeImg();
+                    window.app.toggleModal('add-modal', false);
+                } catch (e) {
+                    alert("Post failed: " + e.message);
+                } finally {
+                    btn.disabled = false; btn.innerText = "Post";
                 }
-            });
-        }
-
-        // UI Handlers
-        const authModal = document.getElementById('auth-modal');
-        const noteModal = document.getElementById('note-modal');
-        const noteContent = document.getElementById('note-content');
-
-        document.getElementById('btn-login').onclick = () => authModal.classList.add('active');
-        document.getElementById('btn-close-auth').onclick = () => authModal.classList.remove('active');
-        document.getElementById('btn-signin-anon').onclick = async () => {
-            await signInAnonymously(auth);
-            authModal.classList.remove('active');
+            }
         };
 
-        document.getElementById('btn-add-note').onclick = () => noteModal.classList.add('active');
-        document.getElementById('btn-close-note').onclick = () => noteModal.classList.remove('active');
-
-        document.getElementById('btn-submit-note').onclick = async () => {
-            const text = noteContent.value.trim();
-            if (!text || !currentUser) return;
-
-            const btn = document.getElementById('btn-submit-note');
-            btn.disabled = true;
-            btn.textContent = "Pinning...";
-
-            // Pre-calculate position for stability
-            const r = 10 + Math.random() * 8;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos((Math.random() * 2) - 1);
-            const pos = {
-                x: r * Math.sin(phi) * Math.cos(theta),
-                y: r * Math.sin(phi) * Math.sin(theta),
-                z: r * Math.cos(phi)
-            };
-
+        // --- INIT ---
+        async function init() {
             try {
-                const notesCol = collection(db, 'artifacts', appId, 'public', 'data', 'notes');
-                await addDoc(notesCol, {
-                    text: text,
-                    author: currentUser.isAnonymous ? `User-${currentUser.uid.slice(0,4)}` : (currentUser.displayName || 'Guest'),
-                    uid: currentUser.uid,
-                    timestamp: Date.now(),
-                    pos: pos
+                state.app = initializeApp(firebaseConfig);
+                state.auth = getAuth(state.app);
+                state.db = getFirestore(state.app);
+                
+                init3D();
+
+                onAuthStateChanged(state.auth, (user) => {
+                    state.user = user;
+                    const status = document.getElementById('auth-status');
+                    const fab = document.getElementById('fab-container');
+
+                    if (user) {
+                        fab.classList.remove('hidden');
+                        const name = user.isAnonymous ? 'Guest' : (user.displayName || user.email.split('@')[0]);
+                        status.innerHTML = `
+                             <div onclick="window.app.signOut()" class="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-[10px] font-bold tracking-widest uppercase border border-white/10 flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-all shadow-xl active:scale-95">
+                                <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                                <span>${name}</span>
+                                <i class="fas fa-right-from-bracket ml-1 opacity-40"></i>
+                            </div>
+                        `;
+                        
+                        const q = query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'));
+                        onSnapshot(q, (snap) => {
+                            state.noteMeshes.forEach(m => state.scene.remove(m));
+                            state.noteMeshes = [];
+                            snap.docs.forEach(d => createNote(d));
+                        }, (err) => {
+                            console.error("Firestore Error:", err);
+                        });
+                    } else {
+                        fab.classList.add('hidden');
+                        status.innerHTML = `<button onclick="window.app.toggleModal('auth-modal', true)" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Login</button>`;
+                    }
                 });
 
-                noteContent.value = '';
-                noteModal.classList.remove('active');
-                showToast();
-            } catch (e) {
-                console.error("Post Error:", e);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = "Pin Note";
-            }
-        };
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('ui-layer').style.opacity = '1';
 
-        function showToast() {
-            const toast = document.getElementById('toast');
-            toast.style.opacity = '1';
-            setTimeout(() => toast.style.opacity = '0', 3000);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('startup-error').innerText = "Init Error: " + err.message;
+                document.getElementById('startup-error').classList.remove('hidden');
+            }
         }
 
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            core.rotation.y += 0.005;
-            core.rotation.x += 0.003;
+        // --- 3D HELPERS ---
+        function init3D() {
+            state.scene = new THREE.Scene();
+            state.scene.fog = new THREE.FogExp2(0x020617, 0.04);
             
-            // Suble floating effect for notes
-            const time = Date.now() * 0.001;
-            notesGroup.children.forEach((mesh, i) => {
-                mesh.position.y += Math.sin(time + i) * 0.002;
+            state.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
+            state.camera.position.set(0, 0, 16);
+            
+            state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            state.renderer.setSize(window.innerWidth, window.innerHeight);
+            state.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.getElementById('canvas-container').appendChild(state.renderer.domElement);
+            
+            const controls = new OrbitControls(state.camera, state.renderer.domElement);
+            controls.enableDamping = true;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.5;
+            controls.enablePan = true;
+            controls.minDistance = 5;
+            controls.maxDistance = 30;
+            
+            state.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+            const point = new THREE.PointLight(0x6366f1, 2, 50);
+            point.position.set(10, 10, 10);
+            state.scene.add(point);
+            
+            const starGeo = new THREE.BufferGeometry();
+            const starCount = 1000;
+            const pos = new Float32Array(starCount*3);
+            for(let i=0; i<starCount*3; i++) pos[i] = (Math.random()-0.5)*60;
+            starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            state.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({size:0.1, color:0xffffff, transparent:true, opacity:0.5})));
+
+            window.addEventListener('resize', () => {
+                state.camera.aspect = window.innerWidth/window.innerHeight;
+                state.camera.updateProjectionMatrix();
+                state.renderer.setSize(window.innerWidth, window.innerHeight);
             });
 
-            renderer.render(scene, camera);
+            let isMoving = false; 
+            let startT = 0;
+            const cvs = state.renderer.domElement;
+            cvs.addEventListener('pointerdown', () => { isMoving = false; startT = Date.now(); });
+            cvs.addEventListener('pointermove', () => { isMoving = true; });
+            cvs.addEventListener('pointerup', (e) => {
+                if(!isMoving && (Date.now() - startT < 250)) {
+                    state.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    state.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    state.raycaster.setFromCamera(state.pointer, state.camera);
+                    const hits = state.raycaster.intersectObjects(state.noteMeshes, true);
+                    if(hits.length > 0) {
+                        let target = hits[0].object;
+                        while(target.parent && !target.userData.note) target = target.parent;
+                        if(target.userData.note) openView(target.userData.note, target.userData.id);
+                    }
+                }
+            });
+
+            const animate = () => {
+                requestAnimationFrame(animate);
+                controls.update();
+                const t = Date.now() * 0.001;
+                state.noteMeshes.forEach(m => {
+                    m.position.y += Math.sin(t + m.userData.offset) * 0.002;
+                    m.rotation.y += 0.0005;
+                });
+                state.renderer.render(state.scene, state.camera);
+            }
+            animate();
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function createNote(docSnapshot) {
+            const note = docSnapshot.data();
+            const grp = new THREE.Group();
+            grp.userData = { note, id: docSnapshot.id, offset: Math.random() * 20 };
+            
+            const mat = new THREE.MeshStandardMaterial({ color: note.color || 0xffffff, roughness: 0.7 });
+            const box = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.1), mat);
+            grp.add(box);
 
-        // Initialize
-        window.onload = () => {
-            startApp();
-            animate();
-        };
+            if(note.image) {
+                new THREE.TextureLoader().load(note.image, (tex) => {
+                    const img = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.2), new THREE.MeshBasicMaterial({map: tex}));
+                    img.position.set(0, 0.7, 0.06);
+                    grp.add(img);
+                });
+            }
 
+            const cvs = document.createElement('canvas');
+            cvs.width = 256; cvs.height = 128;
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle = '#1e293b'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+            const txt = (note.text || "").substring(0, 25) + (note.text.length>25 ? "..." : "");
+            ctx.fillText(txt, 128, 64);
+            const label = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.6, 1.3),
+                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true })
+            );
+            label.position.set(0, note.image ? -1 : 0, 0.06);
+            grp.add(label);
+
+            grp.position.set(note.pos[0], note.pos[1], note.pos[2]);
+            grp.rotation.set(note.rot[0], note.rot[1], note.rot[2]);
+            
+            state.scene.add(grp);
+            state.noteMeshes.push(grp);
+        }
+
+        function openView(note, docId) {
+            // Check if current user is admin or owner
+            const isAdmin = state.user && ['admin@eugeneevons.com', 'leeeugene1574@gmail.com'].includes(state.user.email);
+            const isOwner = state.user && state.user.uid === note.uid;
+            
+            const body = document.getElementById('view-body');
+            body.innerHTML = `
+                ${note.image ? `<img src="${note.image}" class="w-full h-auto bg-black max-h-[450px] object-contain">` : ''}
+                <div class="p-8">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold uppercase">${(note.author?.[0] || 'A')}</div>
+                            <div>
+                                <p class="font-bold text-slate-900 leading-none">${note.author}</p>
+                                <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">${note.time ? new Date(note.time.seconds * 1000).toLocaleDateString() : 'Now'}</p>
+                            </div>
+                        </div>
+                        ${(isAdmin || isOwner) ? `<button onclick="window.app.deleteNote('${docId}')" class="text-red-400 hover:text-red-600 text-xs font-bold uppercase border border-red-200 px-3 py-1 rounded-full">Delete</button>` : ''}
+                    </div>
+                    <p class="text-xl text-slate-800 font-serif leading-relaxed italic">"${note.text}"</p>
+                </div>
+            `;
+            window.app.toggleModal('view-modal', true);
+        }
+
+        init();
     </script>
 </body>
 </html>
+
 
