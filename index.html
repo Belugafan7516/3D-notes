@@ -6,8 +6,10 @@
     <title>Living Memory</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&family=Merriweather:wght@300;700&display=swap" rel="stylesheet">
+
     <style>
-        body { margin: 0; overflow: hidden; background: #000000; font-family: sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #000000; font-family: 'Inter', sans-serif; touch-action: none; }
         #canvas-container { position: absolute; inset: 0; z-index: 0; }
         #ui-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
         .interactive { pointer-events: auto; }
@@ -25,10 +27,12 @@
             z-index: 100; display: flex; flex-direction: column;
             align-items: center; justify-content: center; color: #6366f1;
         }
-        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 3px; }
+        .color-btn.active { transform: scale(1.2); border-color: white; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+        .tool-btn.active { background-color: #4f46e5; color: white; border-color: #818cf8; }
+        .style-btn.selected { ring: 2px; ring-color: #6366f1; transform: scale(1.05); }
     </style>
     <script type="importmap">
         {
@@ -59,13 +63,15 @@
                 <div class="interactive bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-xl">
                     <h1 class="text-white font-bold tracking-tighter text-lg">LIVING MEMORY</h1>
                 </div>
-                <!-- Admin Button (Hidden by default) -->
                 <button id="admin-trigger" onclick="window.app.toggleModal('admin-modal', true)" class="hidden interactive bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white px-3 py-2 rounded-full border border-red-500/50 transition-all">
                     <i class="fas fa-shield-halved"></i>
                 </button>
             </div>
             
             <div class="flex items-center gap-2">
+                <button id="build-toggle" onclick="window.app.toggleBuildMode()" class="interactive bg-white/10 text-white hover:bg-white/20 p-2 px-3 rounded-full border border-white/10 transition-all">
+                    <i class="fas fa-hammer"></i>
+                </button>
                 <div id="announcement-bell" class="hidden interactive bg-yellow-500/20 text-yellow-400 p-2 rounded-full border border-yellow-500/50 cursor-pointer hover:bg-yellow-500 hover:text-black transition-all" onclick="window.app.toggleModal('news-modal', true)">
                     <i class="fas fa-bullhorn"></i>
                 </div>
@@ -73,12 +79,43 @@
             </div>
         </div>
 
-        <!-- Instructions -->
-        <div class="text-center text-white/30 text-[10px] mb-20 pointer-events-none uppercase tracking-widest font-medium">
-            Drag to Rotate • Pinch to Zoom • Tap Card
+        <div id="instructions" class="text-center text-white/30 text-[10px] mb-20 pointer-events-none uppercase tracking-widest font-medium transition-all">
+            Drag to Rotate • Tap Card to View
         </div>
 
-        <!-- FAB (Add) -->
+        <!-- Position Picker UI (Hidden by default) -->
+        <div id="position-ui" class="hidden absolute bottom-10 left-0 right-0 flex-col items-center gap-4 interactive">
+            <div class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-white text-sm animate-pulse">
+                Tap anywhere to place memory
+            </div>
+            <div class="flex gap-4">
+                <button onclick="window.app.cancelPick()" class="bg-red-500 hover:bg-red-600 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-transform active:scale-90">
+                    <i class="fas fa-xmark text-xl"></i>
+                </button>
+                <button id="confirm-pos-btn" onclick="window.app.confirmPick()" disabled class="bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:opacity-50 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-transform active:scale-90">
+                    <i class="fas fa-check text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Build Palette -->
+        <div id="build-palette" class="interactive hidden absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3">
+            <div class="flex gap-2 bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/10">
+                <button onclick="window.app.setBuildTool('place')" id="tool-place" class="tool-btn active text-white w-10 h-8 rounded-lg border border-transparent transition-all flex items-center justify-center"><i class="fas fa-cube"></i></button>
+                <button onclick="window.app.setBuildTool('inspect')" id="tool-inspect" class="tool-btn text-white w-10 h-8 rounded-lg border border-transparent transition-all flex items-center justify-center"><i class="fas fa-eye"></i></button>
+            </div>
+            <div class="bg-black/60 backdrop-blur-md p-2 rounded-2xl border border-white/10 flex gap-2 shadow-xl">
+                <button onclick="window.app.setBuildColor('#ef4444')" class="color-btn w-8 h-8 rounded-full bg-red-500 border-2 border-transparent transition-all"></button>
+                <button onclick="window.app.setBuildColor('#f97316')" class="color-btn w-8 h-8 rounded-full bg-orange-500 border-2 border-transparent transition-all"></button>
+                <button onclick="window.app.setBuildColor('#eab308')" class="color-btn w-8 h-8 rounded-full bg-yellow-500 border-2 border-transparent transition-all"></button>
+                <button onclick="window.app.setBuildColor('#22c55e')" class="color-btn w-8 h-8 rounded-full bg-green-500 border-2 border-transparent transition-all"></button>
+                <button onclick="window.app.setBuildColor('#3b82f6')" class="color-btn w-8 h-8 rounded-full bg-blue-500 border-2 border-transparent transition-all active"></button>
+                <button onclick="window.app.setBuildColor('#a855f7')" class="color-btn w-8 h-8 rounded-full bg-purple-500 border-2 border-transparent transition-all"></button>
+                <button onclick="window.app.setBuildColor('#ffffff')" class="color-btn w-8 h-8 rounded-full bg-white border-2 border-transparent transition-all"></button>
+                <button onclick="window.app.setBuildColor('#333333')" class="color-btn w-8 h-8 rounded-full bg-neutral-800 border-2 border-transparent transition-all"></button>
+            </div>
+        </div>
+
         <div id="fab-container" class="absolute bottom-8 left-0 right-0 flex justify-center interactive hidden">
             <button onclick="window.app.toggleModal('add-modal', true)" class="bg-indigo-600 hover:bg-indigo-500 text-white w-16 h-16 rounded-full shadow-2xl shadow-indigo-500/40 flex items-center justify-center transition-transform active:scale-90 group">
                 <i class="fas fa-plus text-2xl group-hover:rotate-90 transition-transform"></i>
@@ -86,35 +123,22 @@
         </div>
     </div>
 
-    <!-- AUTH MODAL -->
+    <!-- MODALS -->
+    
+    <!-- Auth Modal -->
     <div id="auth-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl relative">
-            <button onclick="window.app.toggleModal('auth-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
-                <i class="fas fa-xmark text-xl"></i>
-            </button>
-
+            <button onclick="window.app.toggleModal('auth-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fas fa-xmark text-xl"></i></button>
             <h2 id="auth-title" class="text-2xl font-bold text-slate-900 mb-2">Join</h2>
-            <p class="text-slate-500 text-sm mb-6">Leave your mark in the void.</p>
-            
+            <p class="text-slate-500 text-sm mb-6">Leave your mark.</p>
             <div id="auth-error" class="hidden mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 break-words"></div>
-
-            <button onclick="window.app.handleGoogle()" class="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-3 mb-4 shadow-sm active:scale-95">
-                <i class="fab fa-google text-red-500 text-lg"></i>
-                <span>Continue with Google</span>
-            </button>
-
-            <div class="flex items-center gap-4 py-2 mb-4">
-                <div class="flex-1 border-t border-slate-100"></div>
-                <span class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Or Email</span>
-                <div class="flex-1 border-t border-slate-100"></div>
-            </div>
-
+            <button onclick="window.app.handleGoogle()" class="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-3 mb-4 shadow-sm active:scale-95"><i class="fab fa-google text-red-500 text-lg"></i><span>Continue with Google</span></button>
+            <div class="flex items-center gap-4 py-2 mb-4"><div class="flex-1 border-t border-slate-100"></div><span class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Or Email</span><div class="flex-1 border-t border-slate-100"></div></div>
             <form onsubmit="window.app.handleEmailAuth(event)" class="space-y-4">
                 <input type="email" id="email" placeholder="Email" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm" required>
                 <input type="password" id="password" placeholder="Password" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm" required>
                 <button type="submit" id="auth-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-all active:scale-95">Sign In</button>
             </form>
-
             <div class="mt-6 space-y-3">
                 <button onclick="window.app.toggleAuthMode()" id="toggle-auth" class="w-full text-center text-sm text-indigo-600 font-semibold hover:underline">Need an account? Sign Up</button>
                 <button onclick="window.app.handleGuest()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95">Continue as Guest</button>
@@ -122,57 +146,52 @@
         </div>
     </div>
 
-    <!-- VIEW NOTE MODAL -->
+    <!-- View Note Modal -->
     <div id="view-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-        <div class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
-            <button onclick="window.app.toggleModal('view-modal', false)" class="absolute top-4 right-4 bg-black/10 hover:bg-black/20 w-10 h-10 rounded-full flex items-center justify-center text-slate-800 transition-all z-20">
-                <i class="fas fa-xmark"></i>
-            </button>
+        <div id="view-container" class="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative z-10 flex flex-col max-h-[90vh] transition-all">
+            <button onclick="window.app.toggleModal('view-modal', false)" class="absolute top-4 right-4 bg-black/10 hover:bg-black/20 w-10 h-10 rounded-full flex items-center justify-center text-slate-800 transition-all z-20"><i class="fas fa-xmark"></i></button>
             <div id="view-body" class="overflow-y-auto"></div>
         </div>
     </div>
 
-    <!-- ADMIN PANEL MODAL -->
+    <!-- Block Info Modal -->
+    <div id="block-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl relative text-center">
+            <button onclick="window.app.toggleModal('block-modal', false)" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600"><i class="fas fa-xmark"></i></button>
+            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-xl"><i class="fas fa-cube"></i></div>
+            <h3 class="text-lg font-bold text-slate-900">Structure Block</h3>
+            <p id="block-author" class="text-slate-500 text-sm mt-1">Placed by: Unknown</p>
+            <p id="block-date" class="text-slate-400 text-[10px] mt-1 uppercase tracking-widest">Date</p>
+            <div id="block-actions" class="mt-6"></div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
     <div id="admin-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
         <div class="bg-slate-900 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-slate-700 relative z-50 flex flex-col max-h-[90vh]">
             <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
                 <h3 class="text-white font-bold tracking-widest text-sm uppercase"><i class="fas fa-terminal mr-2 text-red-500"></i> Admin Console</h3>
                 <button onclick="window.app.toggleModal('admin-modal', false)" class="text-slate-400 hover:text-white"><i class="fas fa-xmark text-lg"></i></button>
             </div>
-            
             <div class="p-6 overflow-y-auto space-y-8">
-                <!-- Backup/Restore -->
                 <div>
                     <h4 class="text-slate-400 text-xs font-bold uppercase mb-3">Data Management</h4>
                     <div class="grid grid-cols-2 gap-3">
-                        <button onclick="window.app.admin.exportData()" class="bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl text-sm font-medium border border-slate-600">
-                            <i class="fas fa-download mr-2"></i> Export JSON
-                        </button>
-                        <div class="relative">
-                            <button class="w-full bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl text-sm font-medium border border-slate-600">
-                                <i class="fas fa-upload mr-2"></i> Import JSON
-                            </button>
-                            <input type="file" onchange="window.app.admin.importData(event)" class="absolute inset-0 opacity-0 cursor-pointer" accept=".json">
-                        </div>
+                        <button onclick="window.app.admin.exportData()" class="bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl text-sm font-medium border border-slate-600"><i class="fas fa-download mr-2"></i> Export JSON</button>
+                        <div class="relative"><button class="w-full bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl text-sm font-medium border border-slate-600"><i class="fas fa-upload mr-2"></i> Import JSON</button><input type="file" onchange="window.app.admin.importData(event)" class="absolute inset-0 opacity-0 cursor-pointer" accept=".json"></div>
                     </div>
                 </div>
-
-                <!-- Announcements -->
                 <div>
                     <h4 class="text-slate-400 text-xs font-bold uppercase mb-3">Broadcast</h4>
                     <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
                         <input id="announce-title" placeholder="Title" class="w-full bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded-lg text-sm mb-2 focus:border-indigo-500 outline-none">
-                        <textarea id="announce-msg" placeholder="Message to all users..." class="w-full bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded-lg text-sm mb-3 focus:border-indigo-500 outline-none h-20"></textarea>
-                        <button onclick="window.app.admin.sendAnnouncement()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold">Send Announcement</button>
+                        <textarea id="announce-msg" placeholder="Message..." class="w-full bg-slate-900 border border-slate-600 text-white px-3 py-2 rounded-lg text-sm mb-3 focus:border-indigo-500 outline-none h-20"></textarea>
+                        <button onclick="window.app.admin.sendAnnouncement()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-bold">Send</button>
                     </div>
                 </div>
-
-                <!-- Banned Users -->
                 <div>
                     <h4 class="text-slate-400 text-xs font-bold uppercase mb-3">Banned Users</h4>
-                    <div id="banned-list" class="bg-slate-800 rounded-xl border border-slate-700 max-h-40 overflow-y-auto p-2 space-y-2">
-                        <p class="text-slate-500 text-xs text-center p-2">Loading banned users...</p>
-                    </div>
+                    <div id="banned-list" class="bg-slate-800 rounded-xl border border-slate-700 max-h-40 overflow-y-auto p-2 space-y-2"><p class="text-slate-500 text-xs text-center p-2">Loading...</p></div>
                 </div>
             </div>
         </div>
@@ -181,36 +200,50 @@
     <!-- NEWS MODAL -->
     <div id="news-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative border-t-4 border-yellow-400">
-            <button onclick="window.app.toggleModal('news-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
-                <i class="fas fa-xmark text-xl"></i>
-            </button>
+            <button onclick="window.app.toggleModal('news-modal', false)" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fas fa-xmark text-xl"></i></button>
             <div class="text-yellow-500 text-4xl mb-4 text-center"><i class="fas fa-bullhorn"></i></div>
             <h2 id="news-title" class="text-2xl font-bold text-slate-900 mb-2 text-center">No News</h2>
-            <p id="news-body" class="text-slate-600 text-sm leading-relaxed text-center">There are no announcements at this time.</p>
-            <div class="mt-6 text-center">
-                <button onclick="window.app.toggleModal('news-modal', false)" class="text-sm font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">Close</button>
-            </div>
+            <p id="news-body" class="text-slate-600 text-sm leading-relaxed text-center">No announcements.</p>
+            <div class="mt-6 text-center"><button onclick="window.app.toggleModal('news-modal', false)" class="text-sm font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest">Close</button></div>
         </div>
     </div>
 
-    <!-- ADD NOTE MODAL -->
+    <!-- Add Note Modal -->
     <div id="add-modal" class="modal fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm">
         <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[95vh] relative">
             <div class="p-4 border-b flex justify-between items-center">
                 <button onclick="window.app.toggleModal('add-modal', false)" class="text-slate-400 p-2"><i class="fas fa-xmark text-xl"></i></button>
                 <span class="font-bold text-slate-800 uppercase tracking-widest text-[10px]">Add Memory</span>
-                <button onclick="window.app.submitNote()" id="post-btn" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm disabled:opacity-50 active:scale-95 transition-transform shadow-lg">Post</button>
+                <button onclick="window.app.submitNote()" id="post-btn" disabled class="bg-indigo-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-full font-bold text-sm shadow-lg">Post</button>
             </div>
+            
+            <!-- Location Picker Trigger -->
+            <div class="px-4 pt-4">
+                <button onclick="window.app.startPicking()" id="loc-btn" class="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 flex items-center justify-center gap-2 text-sm font-bold hover:bg-indigo-100 transition-colors">
+                    <i class="fas fa-location-dot"></i> <span id="loc-text">Set Location (Required)</span>
+                </button>
+            </div>
+
+            <!-- STYLING OPTIONS -->
+            <div class="p-4 border-b border-slate-100 flex flex-col gap-3">
+                <div class="flex gap-2 justify-center">
+                    <button onclick="window.app.setStyle('font', 'sans')" class="style-btn selected w-8 h-8 rounded bg-white border border-slate-200 font-sans text-xs flex items-center justify-center hover:bg-slate-100" data-type="font" data-val="sans">Aa</button>
+                    <button onclick="window.app.setStyle('font', 'serif')" class="style-btn w-8 h-8 rounded bg-white border border-slate-200 font-serif text-xs flex items-center justify-center hover:bg-slate-100" data-type="font" data-val="serif">Aa</button>
+                    <button onclick="window.app.setStyle('font', 'mono')" class="style-btn w-8 h-8 rounded bg-white border border-slate-200 font-mono text-xs flex items-center justify-center hover:bg-slate-100" data-type="font" data-val="mono">Aa</button>
+                    <button onclick="window.app.setStyle('font', 'hand')" class="style-btn w-8 h-8 rounded bg-white border border-slate-200 text-xs flex items-center justify-center hover:bg-slate-100" style="font-family: 'Caveat', cursive;" data-type="font" data-val="hand">Aa</button>
+                </div>
+                <div class="flex gap-2 justify-center">
+                    <button onclick="window.app.setStyle('bg', 'white')" class="style-btn selected w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm" data-type="bg" data-val="white" title="White"></button>
+                    <button onclick="window.app.setStyle('bg', 'cream')" class="style-btn w-8 h-8 rounded-full bg-[#fef3c7] border border-orange-100 shadow-sm" data-type="bg" data-val="cream" title="Parchment"></button>
+                    <button onclick="window.app.setStyle('bg', 'dark')" class="style-btn w-8 h-8 rounded-full bg-[#1e293b] border border-slate-700 shadow-sm" data-type="bg" data-val="dark" title="Dark"></button>
+                    <button onclick="window.app.setStyle('bg', 'blue')" class="style-btn w-8 h-8 rounded-full bg-[#1e3a8a] border border-blue-900 shadow-sm" data-type="bg" data-val="blue" title="Blueprint"></button>
+                </div>
+            </div>
+
             <div class="p-6 overflow-y-auto">
-                <textarea id="note-text" placeholder="What's on your mind?" class="w-full h-40 p-0 text-xl text-slate-800 border-none resize-none focus:ring-0 placeholder:text-slate-300 outline-none"></textarea>
-                <div id="img-preview-box" class="hidden relative mt-4 rounded-2xl overflow-hidden border border-slate-100">
-                    <img id="img-preview" class="w-full h-auto max-h-60 object-cover bg-black">
-                    <button onclick="window.app.removeImg()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg"><i class="fas fa-trash-can text-xs"></i></button>
-                </div>
-                <div id="img-trigger" onclick="document.getElementById('file-in').click()" class="mt-4 p-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all text-slate-400">
-                    <i class="fas fa-camera text-2xl"></i>
-                    <span class="text-[10px] font-bold uppercase">Add Photo</span>
-                </div>
+                <textarea id="note-text" placeholder="What's on your mind?" class="w-full h-40 p-0 text-xl text-slate-800 border-none resize-none focus:ring-0 placeholder:text-slate-300 outline-none font-sans transition-all"></textarea>
+                <div id="img-preview-box" class="hidden relative mt-4 rounded-2xl overflow-hidden border border-slate-100"><img id="img-preview" class="w-full h-auto max-h-60 object-cover bg-black"><button onclick="window.app.removeImg()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg"><i class="fas fa-trash-can text-xs"></i></button></div>
+                <div id="img-trigger" onclick="document.getElementById('file-in').click()" class="mt-4 p-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all text-slate-400"><i class="fas fa-camera text-2xl"></i><span class="text-[10px] font-bold uppercase">Add Photo</span></div>
                 <input type="file" id="file-in" class="hidden" accept="image/*" onchange="window.app.previewFile(event)">
             </div>
         </div>
@@ -219,32 +252,9 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-        import { 
-            getAuth, 
-            signInWithEmailAndPassword, 
-            createUserWithEmailAndPassword, 
-            signInAnonymously, 
-            onAuthStateChanged, 
-            signOut, 
-            GoogleAuthProvider,
-            signInWithPopup
-        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            deleteDoc,
-            setDoc,
-            doc,
-            getDocs,
-            onSnapshot, 
-            serverTimestamp, 
-            query,
-            orderBy,
-            limit
-        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, setDoc, doc, getDocs, onSnapshot, serverTimestamp, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
         // --- CONFIG ---
         const firebaseConfig = {
@@ -260,13 +270,38 @@
         const APP_UID = firebaseConfig.projectId;
         const ADMINS = ['admin@eugeneevons.com', 'leeeugene1574@gmail.com'];
 
+        // --- STYLES ---
+        const STYLES = {
+            bg: {
+                white: { color: '#ffffff', text: '#1e293b', label: 'White' },
+                cream: { color: '#fef3c7', text: '#451a03', label: 'Parchment' },
+                dark: { color: '#1e293b', text: '#f8fafc', label: 'Dark' },
+                blue: { color: '#172554', text: '#bfdbfe', label: 'Blueprint' }
+            },
+            font: {
+                sans: { family: "'Inter', sans-serif", label: 'Sans' },
+                serif: { family: "'Merriweather', serif", label: 'Serif' },
+                mono: { family: "'JetBrains Mono', monospace", label: 'Mono' },
+                hand: { family: "'Caveat', cursive", label: 'Hand' }
+            }
+        };
+
         // --- STATE ---
         const state = {
             app: null, auth: null, db: null, user: null,
             isLoginMode: true, selectedImg: null,
-            scene: null, camera: null, renderer: null,
-            noteMeshes: [], raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2(),
-            isAdmin: false
+            scene: null, camera: null, renderer: null, controls: null,
+            noteMeshes: [], structureMeshes: [],
+            raycaster: new THREE.Raycaster(), pointer: new THREE.Vector2(),
+            isAdmin: false,
+            isBuildMode: false, buildColor: '#3b82f6', buildTool: 'place', gridHelper: null, ghostBlock: null,
+            currentStyle: { font: 'sans', bg: 'white' },
+            starGeo: null, starCount: 2000,
+            // Positioning Logic
+            isPickingLocation: false,
+            placementSphere: null,
+            pickedPosition: null,
+            ghostNote: null
         };
 
         // --- EXPORTS ---
@@ -275,9 +310,106 @@
                 const el = document.getElementById(id);
                 if(el) {
                     el.classList.toggle('active', show);
-                    // Refresh banned list when opening admin
                     if(id === 'admin-modal' && show) window.app.admin.refreshBans();
+                    // Reset picking if adding
+                    if(id === 'add-modal' && show) {
+                        state.pickedPosition = null;
+                        document.getElementById('post-btn').disabled = true;
+                        document.getElementById('loc-btn').classList.remove('bg-green-50', 'text-green-600', 'border-green-200');
+                        document.getElementById('loc-text').innerText = "Set Location (Required)";
+                    }
                 }
+            },
+            
+            // --- LOCATION PICKER ---
+            startPicking: () => {
+                state.isPickingLocation = true;
+                window.app.toggleModal('add-modal', false);
+                document.getElementById('fab-container').classList.add('hidden');
+                document.getElementById('position-ui').classList.remove('hidden');
+                document.getElementById('position-ui').classList.add('flex');
+                state.placementSphere.visible = true; // Enable raycast target
+                state.ghostNote.visible = false;
+                document.getElementById('confirm-pos-btn').disabled = true;
+            },
+
+            cancelPick: () => {
+                state.isPickingLocation = false;
+                state.placementSphere.visible = false;
+                state.ghostNote.visible = false;
+                document.getElementById('position-ui').classList.add('hidden');
+                document.getElementById('position-ui').classList.remove('flex');
+                document.getElementById('fab-container').classList.remove('hidden');
+                window.app.toggleModal('add-modal', true);
+            },
+
+            confirmPick: () => {
+                if(!state.pickedPosition) return;
+                state.isPickingLocation = false;
+                state.placementSphere.visible = false;
+                state.ghostNote.visible = false;
+                document.getElementById('position-ui').classList.add('hidden');
+                document.getElementById('position-ui').classList.remove('flex');
+                document.getElementById('fab-container').classList.remove('hidden');
+                
+                // Update UI in Modal
+                window.app.toggleModal('add-modal', true);
+                const btn = document.getElementById('loc-btn');
+                btn.classList.add('bg-green-50', 'text-green-600', 'border-green-200');
+                document.getElementById('loc-text').innerText = "Location Set ✓";
+                document.getElementById('post-btn').disabled = false;
+            },
+
+            // --- STYLING ---
+            setStyle: (type, val) => {
+                state.currentStyle[type] = val;
+                document.querySelectorAll(`.style-btn[data-type="${type}"]`).forEach(b => {
+                    b.classList.toggle('selected', b.dataset.val === val);
+                    b.classList.toggle('ring-2', b.dataset.val === val);
+                    b.classList.toggle('ring-indigo-500', b.dataset.val === val);
+                });
+                const txt = document.getElementById('note-text');
+                if (type === 'font') txt.style.fontFamily = STYLES.font[val].family;
+            },
+
+            toggleBuildMode: () => {
+                state.isBuildMode = !state.isBuildMode;
+                const btn = document.getElementById('build-toggle');
+                const instr = document.getElementById('instructions');
+                const fab = document.getElementById('fab-container');
+                const palette = document.getElementById('build-palette');
+
+                if (state.isBuildMode) {
+                    btn.classList.add('bg-indigo-600', 'border-indigo-500');
+                    instr.innerText = "Select Tool & Tap Grid/Block";
+                    fab.classList.add('hidden');
+                    palette.classList.remove('hidden');
+                    state.gridHelper.visible = true;
+                    state.ghostBlock.visible = (state.buildTool === 'place');
+                    state.controls.enableRotate = false;
+                } else {
+                    btn.classList.remove('bg-indigo-600', 'border-indigo-500');
+                    instr.innerText = "Drag to Rotate • Tap Card to View";
+                    if(state.user) fab.classList.remove('hidden');
+                    palette.classList.add('hidden');
+                    state.gridHelper.visible = false;
+                    state.ghostBlock.visible = false;
+                    state.controls.enableRotate = true;
+                }
+            },
+
+            setBuildTool: (tool) => {
+                state.buildTool = tool;
+                document.getElementById('tool-place').classList.toggle('active', tool === 'place');
+                document.getElementById('tool-inspect').classList.toggle('active', tool === 'inspect');
+                if (state.isBuildMode) state.ghostBlock.visible = (tool === 'place');
+            },
+
+            setBuildColor: (color) => {
+                state.buildColor = color;
+                state.ghostBlock.material.color.set(color);
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                event.target.classList.add('active');
             },
             
             toggleAuthMode: () => {
@@ -289,202 +421,103 @@
             },
 
             handleGoogle: async () => {
-                const err = document.getElementById('auth-error');
-                err.classList.add('hidden');
-                try {
-                    await signInWithPopup(state.auth, new GoogleAuthProvider());
-                    window.app.toggleModal('auth-modal', false);
-                } catch (e) {
-                    console.error(e);
-                    err.innerText = e.message.replace("Firebase: ", "");
-                    err.classList.remove('hidden');
-                }
+                try { await signInWithPopup(state.auth, new GoogleAuthProvider()); window.app.toggleModal('auth-modal', false); } 
+                catch (e) { document.getElementById('auth-error').innerText = e.message.replace("Firebase: ", ""); document.getElementById('auth-error').classList.remove('hidden'); }
             },
 
             handleGuest: async () => {
-                const err = document.getElementById('auth-error');
-                try {
-                    err.classList.add('hidden');
-                    await signInAnonymously(state.auth);
-                    window.app.toggleModal('auth-modal', false);
-                } catch (e) {
-                    err.innerText = "Guest Error: " + e.message;
-                    err.classList.remove('hidden');
-                }
+                try { await signInAnonymously(state.auth); window.app.toggleModal('auth-modal', false); } catch (e) {}
             },
 
             handleEmailAuth: async (e) => {
                 e.preventDefault();
                 const email = document.getElementById('email').value;
                 const pass = document.getElementById('password').value;
-                const btn = document.getElementById('auth-btn');
-                const err = document.getElementById('auth-error');
-                
-                err.classList.add('hidden');
-                btn.disabled = true;
-                btn.innerText = "Processing...";
-                
                 try {
-                    if (state.isLoginMode) {
-                        await signInWithEmailAndPassword(state.auth, email, pass);
-                    } else {
-                        await createUserWithEmailAndPassword(state.auth, email, pass);
-                    }
+                    if (state.isLoginMode) await signInWithEmailAndPassword(state.auth, email, pass);
+                    else await createUserWithEmailAndPassword(state.auth, email, pass);
                     window.app.toggleModal('auth-modal', false);
-                } catch (error) {
-                    err.innerText = error.message.replace("Firebase: ", "");
-                    err.classList.remove('hidden');
-                } finally {
-                    btn.disabled = false;
-                    btn.innerText = state.isLoginMode ? "Sign In" : "Create Account";
-                }
+                } catch (error) { document.getElementById('auth-error').innerText = error.message.replace("Firebase: ", ""); document.getElementById('auth-error').classList.remove('hidden'); }
             },
 
-            signOut: async () => {
-                try { await signOut(state.auth); } catch(e) { console.error(e); }
-            },
+            signOut: async () => { try { await signOut(state.auth); } catch(e) {} },
 
-            // --- ADMIN ACTIONS ---
             admin: {
                 deleteNote: async (docId) => {
                     if(!confirm("Permanently delete this note?")) return;
-                    try {
-                        await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId));
-                        window.app.toggleModal('view-modal', false);
-                    } catch (e) { alert(e.message); }
+                    try { await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId)); window.app.toggleModal('view-modal', false); } catch (e) { alert(e.message); }
                 },
-
                 banUser: async (uid) => {
-                    if(!confirm(`Ban user ${uid}? They will not be able to post.`)) return;
-                    try {
-                        await setDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users', uid), {
-                            bannedAt: serverTimestamp(),
-                            bannedBy: state.user.email
-                        });
-                        alert("User Banned");
-                        window.app.toggleModal('view-modal', false);
-                    } catch (e) { alert("Ban Failed: " + e.message); }
+                    if(!confirm(`Ban user ${uid}?`)) return;
+                    try { await setDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users', uid), { bannedAt: serverTimestamp(), bannedBy: state.user.email }); alert("User Banned"); window.app.toggleModal('view-modal', false); } catch (e) { alert("Ban Failed: " + e.message); }
                 },
-
                 unbanUser: async (uid) => {
                     if(!confirm("Unban user?")) return;
-                    try {
-                        await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users', uid));
-                        window.app.admin.refreshBans();
-                    } catch (e) { alert(e.message); }
+                    try { await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users', uid)); window.app.admin.refreshBans(); } catch (e) { alert(e.message); }
                 },
-
                 refreshBans: async () => {
                     const list = document.getElementById('banned-list');
-                    list.innerHTML = '<p class="text-slate-500 text-xs text-center">Loading...</p>';
                     try {
                         const snap = await getDocs(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'banned_users'));
-                        if(snap.empty) {
-                            list.innerHTML = '<p class="text-slate-500 text-xs text-center">No banned users.</p>';
-                            return;
-                        }
-                        list.innerHTML = '';
+                        list.innerHTML = snap.empty ? '<p class="text-slate-500 text-xs text-center">No banned users.</p>' : '';
                         snap.forEach(d => {
-                            const div = document.createElement('div');
-                            div.className = "flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700";
-                            div.innerHTML = `
-                                <span class="text-white text-xs font-mono truncate w-32">${d.id}</span>
-                                <button onclick="window.app.admin.unbanUser('${d.id}')" class="text-green-400 hover:text-green-300 text-xs uppercase font-bold">Unban</button>
-                            `;
-                            list.appendChild(div);
+                            list.innerHTML += `<div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-700"><span class="text-white text-xs font-mono truncate w-32">${d.id}</span><button onclick="window.app.admin.unbanUser('${d.id}')" class="text-green-400 text-xs uppercase font-bold">Unban</button></div>`;
                         });
                     } catch (e) { list.innerText = "Error loading bans."; }
                 },
-
                 exportData: async () => {
                     try {
                         const snap = await getDocs(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'));
-                        const data = [];
-                        snap.forEach(d => data.push({id: d.id, ...d.data()}));
+                        const data = []; snap.forEach(d => data.push({id: d.id, ...d.data()}));
                         const blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
                         const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url; a.download = `echoes_backup_${new Date().toISOString().split('T')[0]}.json`;
-                        a.click();
+                        const a = document.createElement('a'); a.href = url; a.download = `echoes_backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
                     } catch (e) { alert("Export Failed: " + e.message); }
                 },
-
                 importData: (e) => {
-                    const file = e.target.files[0];
-                    if(!file) return;
+                    const file = e.target.files[0]; if(!file) return;
                     const reader = new FileReader();
                     reader.onload = async (ev) => {
                         try {
                             const data = JSON.parse(ev.target.result);
                             if(!Array.isArray(data)) throw new Error("Invalid format");
-                            if(!confirm(`Import ${data.length} memories? This cannot be undone.`)) return;
-                            
-                            let count = 0;
-                            for(const note of data) {
-                                // Strip ID to create new docs
-                                const { id, ...rest } = note; 
-                                await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'), {
-                                    ...rest,
-                                    time: serverTimestamp() // Reset time or keep original? Resetting safer for sort.
-                                });
-                                count++;
-                            }
-                            alert(`Imported ${count} memories.`);
+                            if(!confirm(`Import ${data.length} memories?`)) return;
+                            for(const note of data) { const { id, ...rest } = note; await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'), { ...rest, time: serverTimestamp() }); }
+                            alert("Imported.");
                         } catch (err) { alert("Import Failed: " + err.message); }
-                    };
-                    reader.readAsText(file);
+                    }; reader.readAsText(file);
                 },
-
                 sendAnnouncement: async () => {
                     const title = document.getElementById('announce-title').value;
                     const msg = document.getElementById('announce-msg').value;
-                    if(!title || !msg) return alert("Title and Message required");
-                    
-                    try {
-                        await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'announcements'), {
-                            title,
-                            message: msg,
-                            createdAt: serverTimestamp()
-                        });
-                        alert("Announcement Sent!");
-                        document.getElementById('announce-title').value = "";
-                        document.getElementById('announce-msg').value = "";
-                    } catch (e) { alert("Send failed: " + e.message); }
+                    if(title && msg) await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'announcements'), { title, message: msg, createdAt: serverTimestamp() });
+                    alert("Sent!");
                 }
             },
 
-            // --- NOTE ACTIONS ---
             deleteSelf: async (docId) => {
-                if(!confirm("Delete your memory?")) return;
+                if(!confirm("Delete?")) return;
+                try { await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId)); window.app.toggleModal('view-modal', false); } catch (e) { alert(e.message); }
+            },
+
+            deleteBlock: async (docId) => {
+                if(!confirm("Destroy this block?")) return;
                 try {
-                    await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories', docId));
-                    window.app.toggleModal('view-modal', false);
-                } catch (e) { alert(e.message); }
+                    await deleteDoc(doc(state.db, 'artifacts', APP_UID, 'public', 'data', 'structures', docId));
+                    window.app.toggleModal('block-modal', false);
+                } catch (e) { alert("Delete failed: " + e.message); }
             },
 
             previewFile: (e) => {
-                const f = e.target.files[0];
-                if(!f) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const img = new Image();
-                    img.src = ev.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX = 640;
-                        let w = img.width, h = img.height;
-                        if(w>h) { if(w>MAX){h*=MAX/w; w=MAX}} else { if(h>MAX){w*=MAX/h; h=MAX}}
-                        canvas.width = w; canvas.height = h;
-                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                        state.selectedImg = canvas.toDataURL('image/jpeg', 0.85);
-                        document.getElementById('img-preview').src = state.selectedImg;
-                        document.getElementById('img-preview-box').classList.remove('hidden');
-                        document.getElementById('img-trigger').classList.add('hidden');
+                const f = e.target.files[0]; if(!f) return;
+                const r = new FileReader(); r.onload = (ev) => {
+                    const i = new Image(); i.src = ev.target.result; i.onload = () => {
+                        const c = document.createElement('canvas'); const m = 640; let w=i.width, h=i.height; if(w>h){if(w>m){h*=m/w;w=m}}else{if(h>m){w*=m/h;h=m}} c.width=w; c.height=h; c.getContext('2d').drawImage(i,0,0,w,h);
+                        state.selectedImg = c.toDataURL('image/jpeg', 0.85); document.getElementById('img-preview').src = state.selectedImg; document.getElementById('img-preview-box').classList.remove('hidden'); document.getElementById('img-trigger').classList.add('hidden');
                     }
-                }
-                reader.readAsDataURL(f);
+                }; r.readAsDataURL(f);
             },
-
+            
             removeImg: () => {
                 state.selectedImg = null;
                 document.getElementById('img-preview-box').classList.add('hidden');
@@ -495,20 +528,22 @@
             submitNote: async () => {
                 const txt = document.getElementById('note-text').value;
                 if(!txt.trim()) return;
+                if(!state.pickedPosition) return alert("Please select a location first!"); // Fallback check
+                
                 const btn = document.getElementById('post-btn');
                 btn.disabled = true; btn.innerText = "...";
 
                 try {
-                    const rad = 10 + Math.random() * 5;
-                    const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.acos(Math.random() * 2 - 1);
+                    const pos = state.pickedPosition;
+                    // Random rotation for the card itself
+                    const rot = [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, 0];
                     
                     await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'), {
                         text: txt,
                         image: state.selectedImg,
-                        pos: [rad * Math.sin(phi) * Math.cos(theta), rad * Math.sin(phi) * Math.sin(theta), rad * Math.cos(phi)],
-                        rot: [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, 0],
-                        color: ["#ffffff", "#fef3c7", "#e0f2fe", "#fce7f3"][Math.floor(Math.random()*4)],
+                        pos: [pos.x, pos.y, pos.z],
+                        rot: rot,
+                        style: state.currentStyle,
                         author: state.user.isAnonymous ? "Guest" : (state.user.displayName || state.user.email.split('@')[0]),
                         uid: state.user.uid,
                         time: serverTimestamp()
@@ -525,56 +560,38 @@
             }
         };
 
-        // --- INIT ---
+        // --- INIT & LOGIC ---
         async function init() {
             try {
                 state.app = initializeApp(firebaseConfig);
                 state.auth = getAuth(state.app);
                 state.db = getFirestore(state.app);
-                
                 init3D();
-
                 onAuthStateChanged(state.auth, (user) => {
                     state.user = user;
                     state.isAdmin = user && user.email && ADMINS.includes(user.email);
-                    
                     const status = document.getElementById('auth-status');
                     const fab = document.getElementById('fab-container');
                     const adminBtn = document.getElementById('admin-trigger');
-
                     if (user) {
-                        fab.classList.remove('hidden');
+                        if (!state.isBuildMode) fab.classList.remove('hidden');
                         if (state.isAdmin) adminBtn.classList.remove('hidden');
-                        else adminBtn.classList.add('hidden');
-
-                        const name = user.isAnonymous ? 'Guest' : (user.displayName || user.email.split('@')[0]);
-                        status.innerHTML = `
-                             <div onclick="window.app.signOut()" class="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-[10px] font-bold tracking-widest uppercase border border-white/10 flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-all shadow-xl active:scale-95">
-                                <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
-                                <span>${name}</span>
-                                <i class="fas fa-right-from-bracket ml-1 opacity-40"></i>
-                            </div>
-                        `;
+                        status.innerHTML = `<div onclick="window.app.signOut()" class="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-[10px] font-bold tracking-widest uppercase border border-white/10 cursor-pointer"><span class="w-1.5 h-1.5 rounded-full bg-green-400 inline-block mr-2"></span>${user.isAnonymous?'Guest':user.displayName||user.email.split('@')[0]}</div>`;
                         
-                        // Listen for Memories
-                        const q = query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories'));
-                        onSnapshot(q, (snap) => {
-                            state.noteMeshes.forEach(m => state.scene.remove(m));
-                            state.noteMeshes = [];
+                        onSnapshot(query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'memories')), (snap) => {
+                            state.noteMeshes.forEach(m => state.scene.remove(m)); state.noteMeshes = [];
                             snap.docs.forEach(d => createNote(d));
                         });
-
-                        // Listen for Announcements
-                        const announceQ = query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'announcements'), orderBy('createdAt', 'desc'), limit(1));
-                        onSnapshot(announceQ, (snap) => {
+                        onSnapshot(query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'structures')), (snap) => {
+                            state.structureMeshes.forEach(m => state.scene.remove(m)); state.structureMeshes = [];
+                            snap.docs.forEach(d => createStructure(d));
+                        });
+                        onSnapshot(query(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'announcements'), orderBy('createdAt', 'desc'), limit(1)), (snap) => {
                             if (!snap.empty) {
                                 const latest = snap.docs[0].data();
-                                const bell = document.getElementById('announcement-bell');
-                                bell.classList.remove('hidden');
+                                document.getElementById('announcement-bell').classList.remove('hidden');
                                 document.getElementById('news-title').innerText = latest.title;
                                 document.getElementById('news-body').innerText = latest.message;
-                                
-                                // Auto-show if new (simple check via localStorage)
                                 const lastSeen = localStorage.getItem('last_news_id');
                                 if (lastSeen !== snap.docs[0].id) {
                                     window.app.toggleModal('news-modal', true);
@@ -582,156 +599,138 @@
                                 }
                             }
                         });
-
                     } else {
                         fab.classList.add('hidden');
-                        adminBtn.classList.add('hidden');
-                        status.innerHTML = `<button onclick="window.app.toggleModal('auth-modal', true)" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-transform">Login</button>`;
+                        status.innerHTML = `<button onclick="window.app.toggleModal('auth-modal', true)" class="bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-xs uppercase shadow-lg">Login</button>`;
                     }
                 });
-
                 document.getElementById('loader').style.display = 'none';
                 document.getElementById('ui-layer').style.opacity = '1';
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('startup-error').innerText = "Init Error: " + err.message;
-                document.getElementById('startup-error').classList.remove('hidden');
-            }
+            } catch (err) { console.error(err); }
         }
 
-        // --- 3D HELPERS ---
         function init3D() {
-            state.scene = new THREE.Scene();
-            state.scene.fog = new THREE.FogExp2(0x000000, 0.04);
-            
-            state.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
-            state.camera.position.set(0, 0, 16);
-            
+            state.scene = new THREE.Scene(); state.scene.fog = new THREE.FogExp2(0x000000, 0.04);
+            state.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100); state.camera.position.set(0, 5, 20);
             state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             state.renderer.setSize(window.innerWidth, window.innerHeight);
-            state.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.getElementById('canvas-container').appendChild(state.renderer.domElement);
-            
-            const controls = new OrbitControls(state.camera, state.renderer.domElement);
-            controls.enableDamping = true;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.5;
-            controls.enablePan = true;
-            controls.minDistance = 5;
-            controls.maxDistance = 30;
-            
+            state.controls = new OrbitControls(state.camera, state.renderer.domElement);
+            state.controls.enableDamping = true; state.controls.autoRotate = true; state.controls.autoRotateSpeed = 0.5; state.controls.enablePan = true;
             state.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            const point = new THREE.PointLight(0x6366f1, 2, 50);
-            point.position.set(10, 10, 10);
-            state.scene.add(point);
+            state.scene.add(new THREE.PointLight(0x6366f1, 2, 50)).position.set(10, 10, 10);
             
+            // Grid & Ghost
+            state.gridHelper = new THREE.GridHelper(40, 40, 0x444444, 0x222222); state.gridHelper.visible = false; state.scene.add(state.gridHelper);
+            state.ghostBlock = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5, wireframe: true })); state.ghostBlock.visible = false; state.scene.add(state.ghostBlock);
+            
+            // Placement Sphere & Ghost Note
+            const sphereGeo = new THREE.SphereGeometry(14, 32, 32);
+            // Visible: false material still rays casts, but doesn't render
+            state.placementSphere = new THREE.Mesh(sphereGeo, new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })); 
+            state.scene.add(state.placementSphere);
+
+            const ghostCardGeo = new THREE.BoxGeometry(3, 4, 0.1);
+            const ghostCardMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.3, wireframe: true });
+            state.ghostNote = new THREE.Mesh(ghostCardGeo, ghostCardMat);
+            state.ghostNote.visible = false;
+            state.scene.add(state.ghostNote);
+
+            // Infinite Stars
             const starGeo = new THREE.BufferGeometry();
-            const starCount = 1500;
+            const starCount = 2000;
             const pos = new Float32Array(starCount*3);
-            for(let i=0; i<starCount*3; i++) pos[i] = (Math.random()-0.5)*60;
+            for(let i=0; i<starCount*3; i++) pos[i] = (Math.random()-0.5)*200;
             starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            state.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({size:0.1, color:0xffffff, transparent:true, opacity:0.5})));
+            state.starGeo = starGeo; state.starCount = starCount;
+            state.scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({size:0.15, color:0xffffff, transparent:true, opacity:0.8})));
 
-            window.addEventListener('resize', () => {
-                state.camera.aspect = window.innerWidth/window.innerHeight;
-                state.camera.updateProjectionMatrix();
-                state.renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-
-            let isMoving = false; 
-            let startT = 0;
-            const cvs = state.renderer.domElement;
+            window.addEventListener('resize', () => { state.camera.aspect = window.innerWidth/window.innerHeight; state.camera.updateProjectionMatrix(); state.renderer.setSize(window.innerWidth, window.innerHeight); });
+            
+            // INTERACTIONS
+            let isMoving = false; let startT = 0; const cvs = state.renderer.domElement;
             cvs.addEventListener('pointerdown', () => { isMoving = false; startT = Date.now(); });
-            cvs.addEventListener('pointermove', () => { isMoving = true; });
+            cvs.addEventListener('pointermove', (e) => { 
+                isMoving = true; 
+                if(state.isBuildMode && state.buildTool === 'place') updateGhost(e); 
+            });
             cvs.addEventListener('pointerup', (e) => {
-                if(!isMoving && (Date.now() - startT < 250)) {
-                    state.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-                    state.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                    state.raycaster.setFromCamera(state.pointer, state.camera);
-                    const hits = state.raycaster.intersectObjects(state.noteMeshes, true);
-                    if(hits.length > 0) {
-                        let target = hits[0].object;
-                        while(target.parent && !target.userData.note) target = target.parent;
-                        if(target.userData.note) openView(target.userData.note, target.userData.id);
-                    }
+                if(!isMoving && (Date.now()-startT < 250)) {
+                    if (state.isPickingLocation) {
+                        handleLocationPick(e);
+                    } else if(state.isBuildMode) {
+                        if (state.buildTool === 'place') placeBlock(); else checkInspect(e);
+                    } else handleNoteClick(e);
                 }
             });
 
-            const animate = () => {
-                requestAnimationFrame(animate);
-                controls.update();
+            const animate = () => { 
+                requestAnimationFrame(animate); 
+                state.controls.update(); 
                 const t = Date.now() * 0.001;
-                state.noteMeshes.forEach(m => {
-                    m.position.y += Math.sin(t + m.userData.offset) * 0.002;
-                    m.rotation.y += 0.0005;
-                });
-                state.renderer.render(state.scene, state.camera);
-            }
+                state.noteMeshes.forEach(m => { m.position.y += Math.sin(t + m.userData.offset)*0.002; m.rotation.y += 0.0005; });
+                
+                // Stars
+                const positions = state.starGeo.attributes.position.array;
+                const cx = state.camera.position.x; const cy = state.camera.position.y; const cz = state.camera.position.z;
+                const range = 100;
+                for (let i = 0; i < state.starCount; i++) {
+                    const i3 = i * 3;
+                    if (positions[i3] < cx - range) positions[i3] += range * 2; else if (positions[i3] > cx + range) positions[i3] -= range * 2;
+                    if (positions[i3 + 1] < cy - range) positions[i3 + 1] += range * 2; else if (positions[i3 + 1] > cy + range) positions[i3 + 1] -= range * 2;
+                    if (positions[i3 + 2] < cz - range) positions[i3 + 2] += range * 2; else if (positions[i3 + 2] > cz + range) positions[i3 + 2] -= range * 2;
+                }
+                state.starGeo.attributes.position.needsUpdate = true;
+                state.renderer.render(state.scene, state.camera); 
+            };
             animate();
         }
 
-        function createNote(docSnapshot) {
-            const note = docSnapshot.data();
-            const grp = new THREE.Group();
-            grp.userData = { note, id: docSnapshot.id, offset: Math.random() * 20 };
+        function handleLocationPick(e) {
+            state.pointer.x = (e.clientX / window.innerWidth) * 2 - 1; 
+            state.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            state.raycaster.setFromCamera(state.pointer, state.camera);
             
-            const mat = new THREE.MeshStandardMaterial({ color: note.color || 0xffffff, roughness: 0.7 });
-            const box = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.1), mat);
-            grp.add(box);
-
-            if(note.image) {
-                new THREE.TextureLoader().load(note.image, (tex) => {
-                    const img = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.2), new THREE.MeshBasicMaterial({map: tex}));
-                    img.position.set(0, 0.7, 0.06);
-                    grp.add(img);
-                });
+            // Raycast against invisible sphere
+            const intersects = state.raycaster.intersectObject(state.placementSphere);
+            
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                state.pickedPosition = point;
+                state.ghostNote.position.copy(point);
+                state.ghostNote.lookAt(0,0,0); // Orient towards center for now
+                state.ghostNote.visible = true;
+                
+                document.getElementById('confirm-pos-btn').disabled = false;
             }
-
-            const cvs = document.createElement('canvas');
-            cvs.width = 256; cvs.height = 128;
-            const ctx = cvs.getContext('2d');
-            ctx.fillStyle = '#1e293b'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
-            const txt = (note.text || "").substring(0, 25) + (note.text.length>25 ? "..." : "");
-            ctx.fillText(txt, 128, 64);
-            const label = new THREE.Mesh(
-                new THREE.PlaneGeometry(2.6, 1.3),
-                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true })
-            );
-            label.position.set(0, note.image ? -1 : 0, 0.06);
-            grp.add(label);
-
-            grp.position.set(note.pos[0], note.pos[1], note.pos[2]);
-            grp.rotation.set(note.rot[0], note.rot[1], note.rot[2]);
-            
-            state.scene.add(grp);
-            state.noteMeshes.push(grp);
         }
 
+        // ... [Standard helpers from previous steps: updateGhost, placeBlock, checkInspect, handleNoteClick, createStructure, createNote, openView] ...
+        function updateGhost(e) { state.pointer.x = (e.clientX / window.innerWidth) * 2 - 1; state.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1; state.raycaster.setFromCamera(state.pointer, state.camera); const hits = state.raycaster.intersectObjects(state.structureMeshes); if (hits.length > 0) state.ghostBlock.position.copy(hits[0].object.position).add(hits[0].face.normal); else { const target = new THREE.Vector3(); state.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), target); if(target) state.ghostBlock.position.set(Math.round(target.x), Math.abs(Math.round(target.y))+0.5, Math.round(target.z)); } }
+        async function placeBlock() { if(!state.user) return alert("Login to build!"); try { await addDoc(collection(state.db, 'artifacts', APP_UID, 'public', 'data', 'structures'), { x: state.ghostBlock.position.x, y: state.ghostBlock.position.y, z: state.ghostBlock.position.z, color: state.buildColor, uid: state.user.uid, author: state.user.isAnonymous ? "Guest" : (state.user.displayName || "Unknown"), createdAt: serverTimestamp() }); } catch(e) { alert("Build Error: " + e.message); } }
+        function checkInspect(e) { state.pointer.x = (e.clientX / window.innerWidth) * 2 - 1; state.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1; state.raycaster.setFromCamera(state.pointer, state.camera); const hits = state.raycaster.intersectObjects(state.structureMeshes); if (hits.length > 0) { const block = hits[0].object.userData; document.getElementById('block-author').innerText = "Placed by: " + (block.author || "Unknown"); document.getElementById('block-date').innerText = block.createdAt ? new Date(block.createdAt.seconds * 1000).toLocaleDateString() : "Just now"; const isOwner = state.user && (state.user.uid === block.uid || state.isAdmin); document.getElementById('block-actions').innerHTML = isOwner ? `<button onclick="window.app.deleteBlock('${block.id}')" class="bg-red-500 hover:bg-red-600 text-white w-full py-2 rounded-lg font-bold text-xs uppercase shadow">Delete Block</button>` : ''; window.app.toggleModal('block-modal', true); } }
+        function handleNoteClick(e) { state.pointer.x = (e.clientX / window.innerWidth) * 2 - 1; state.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1; state.raycaster.setFromCamera(state.pointer, state.camera); const hits = state.raycaster.intersectObjects(state.noteMeshes, true); if(hits.length > 0) { let t = hits[0].object; while(t.parent && !t.userData.note) t = t.parent; if(t.userData.note) openView(t.userData.note, t.userData.id); } }
+        function createStructure(d) { const data = d.data(); const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({color: data.color || '#ccc'})); mesh.position.set(data.x, data.y, data.z); mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({color: 0x000000}))); mesh.userData = { id: d.id, ...data }; state.scene.add(mesh); state.structureMeshes.push(mesh); }
+        function createNote(d) {
+            const note = d.data(); const grp = new THREE.Group(); grp.userData = { note, id: d.id, offset: Math.random() * 20 };
+            const bgKey = (note.style && note.style.bg) ? note.style.bg : 'white'; const fontKey = (note.style && note.style.font) ? note.style.font : 'sans'; const bgData = STYLES.bg[bgKey] || STYLES.bg['white'];
+            const mat = new THREE.MeshStandardMaterial({ color: bgData.color, roughness: 0.8 }); const box = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 0.1), mat); grp.add(box);
+            if(note.image) { new THREE.TextureLoader().load(note.image, (tex) => { const img = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.2), new THREE.MeshBasicMaterial({map: tex})); img.position.set(0, 0.7, 0.06); grp.add(img); }); }
+            const cvs = document.createElement('canvas'); cvs.width = 256; cvs.height = 128; const ctx = cvs.getContext('2d'); ctx.fillStyle = bgData.text; 
+            let fontName = 'sans-serif'; if (fontKey === 'serif') fontName = 'serif'; if (fontKey === 'mono') fontName = 'monospace'; if (fontKey === 'hand') fontName = 'cursive';
+            ctx.font = `bold 24px ${fontName}`; ctx.textAlign = 'center'; const txt = (note.text || "").substring(0, 25) + (note.text.length>25 ? "..." : ""); ctx.fillText(txt, 128, 64);
+            const label = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true })); label.position.set(0, note.image ? -1 : 0, 0.06); grp.add(label);
+            grp.position.set(note.pos[0], note.pos[1], note.pos[2]); 
+            // Rotation might be stored or random
+            if (note.rot) grp.rotation.set(note.rot[0], note.rot[1], note.rot[2]);
+            else grp.lookAt(0,0,0);
+            state.scene.add(grp); state.noteMeshes.push(grp);
+        }
         function openView(note, docId) {
             const isOwner = state.user && state.user.uid === note.uid;
-            
-            const body = document.getElementById('view-body');
-            body.innerHTML = `
-                ${note.image ? `<img src="${note.image}" class="w-full h-auto bg-black max-h-[450px] object-contain">` : ''}
-                <div class="p-8">
-                    <div class="flex justify-between items-start mb-6">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold uppercase">${(note.author?.[0] || 'A')}</div>
-                            <div>
-                                <p class="font-bold text-slate-900 leading-none">${note.author}</p>
-                                <p class="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">${note.time ? new Date(note.time.seconds * 1000).toLocaleDateString() : 'Now'}</p>
-                            </div>
-                        </div>
-                        <div class="flex gap-2">
-                            ${(state.isAdmin) ? `<button onclick="window.app.admin.banUser('${note.uid}')" class="text-red-500 bg-red-50 hover:bg-red-100 text-xs font-bold uppercase px-3 py-1 rounded-lg">Ban User</button>` : ''}
-                            ${(state.isAdmin) ? `<button onclick="window.app.admin.deleteNote('${docId}')" class="text-slate-500 bg-slate-100 hover:bg-slate-200 text-xs font-bold uppercase px-3 py-1 rounded-lg">Admin Del</button>` : ''}
-                            ${(isOwner && !state.isAdmin) ? `<button onclick="window.app.deleteSelf('${docId}')" class="text-red-400 hover:text-red-600 text-xs font-bold uppercase border border-red-200 px-3 py-1 rounded-full">Delete</button>` : ''}
-                        </div>
-                    </div>
-                    <p class="text-xl text-slate-800 font-serif leading-relaxed italic">"${note.text}"</p>
-                </div>
-            `;
+            const bgKey = (note.style && note.style.bg) ? note.style.bg : 'white'; const fontKey = (note.style && note.style.font) ? note.style.font : 'sans'; const bgData = STYLES.bg[bgKey]; const fontFam = STYLES.font[fontKey].family;
+            const container = document.getElementById('view-container'); container.style.backgroundColor = bgData.color; container.style.color = bgData.text;
+            const body = document.getElementById('view-body'); body.innerHTML = `${note.image ? `<img src="${note.image}" class="w-full h-auto bg-black max-h-[450px] object-contain">` : ''}<div class="p-8" style="font-family: ${fontFam}"><div class="flex justify-between items-start mb-6"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full flex items-center justify-center font-bold uppercase" style="background-color: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3)">${(note.author?.[0] || 'A')}</div><div><p class="font-bold leading-none">${note.author}</p><p class="text-[10px] opacity-70 mt-1 uppercase tracking-widest">${note.time ? new Date(note.time.seconds * 1000).toLocaleDateString() : 'Now'}</p></div></div><div class="flex gap-2">${(state.isAdmin) ? `<button onclick="window.app.admin.banUser('${note.uid}')" class="text-red-500 bg-red-50/50 hover:bg-red-100 text-xs font-bold uppercase px-3 py-1 rounded-lg">Ban</button>` : ''}${(state.isAdmin) ? `<button onclick="window.app.admin.deleteNote('${docId}')" class="opacity-50 hover:opacity-100 text-xs font-bold uppercase px-3 py-1 rounded-lg border border-current">Del</button>` : ''}${(isOwner && !state.isAdmin) ? `<button onclick="window.app.deleteSelf('${docId}')" class="text-red-400 hover:text-red-600 text-xs font-bold uppercase border border-red-200 px-3 py-1 rounded-full">Delete</button>` : ''}</div></div><p class="text-xl leading-relaxed italic whitespace-pre-wrap">${note.text}</p></div>`;
             window.app.toggleModal('view-modal', true);
         }
 
